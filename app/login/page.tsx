@@ -2,7 +2,17 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-emerald-100 pt-9 pb-9 pl-22 pr-22">
       <div className="bg-white rounded-2xl shadow-lg w-330 h-143 flex">
-        <div className="w-1/2 bg-green"></div>
+        <div className="w-1/2 bg-emerald-200 rounded-l-2xl overflow-hidden">
+          {/* added rounded-l-2xl and overflow-hidden here */}
+          <div className="flex items-center justify-center h-full">
+            <img
+              src="/images/login.gif"
+              alt="Login Image"
+              className="w-full h-full object-cover text-white"
+              /* removed rounded-l-2xl from img */
+            />
+          </div>
+        </div>
         <div className="w-1/2 pt-13 pl-25 pr-25 pb-20">
           <h1 className="flex items-center justify-center text-[30px] pb-10 text-black">
             IdeaSplash
@@ -37,7 +47,9 @@ export default function LoginPage() {
           </div>
           <div className="flex justify-center gap-1 text-[13px] text-black mt-4">
             <p>Are you new?</p>
-            <p className="text-green-500 underline cursor-pointer">Create an Account</p>
+            <p className="text-green-500 underline cursor-pointer">
+              Create an Account
+            </p>
           </div>
         </div>
       </div>
