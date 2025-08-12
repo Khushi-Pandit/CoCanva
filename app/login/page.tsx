@@ -9,7 +9,7 @@ export default function LoginPage() {
   };
 
   const MainScreen = () => {
-    router.push("/main");
+    router.push("/Main");
   }
 
   return (
