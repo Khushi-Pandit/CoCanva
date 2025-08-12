@@ -1,4 +1,13 @@
+"use client";
+import {useRouter} from "next/navigation";
+
 export default function LoginPage() {
+  const router = useRouter();
+
+  const SignUp = () => {
+    router.push("/signup");
+  };
+
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-emerald-100 pt-9 pb-9 pl-22 pr-22">
       <div className="bg-white rounded-2xl shadow-lg w-330 h-143 flex">
@@ -46,7 +55,9 @@ export default function LoginPage() {
           <div className="flex justify-center gap-1 text-[13px] text-black mt-4">
             <p>Are you new?</p>
             <p className="text-green-500 underline cursor-pointer">
+              <span onClick={SignUp} className="cursor-pointer">
               Create an Account
+              </span>
             </p>
           </div>
         </div>
