@@ -8,6 +8,10 @@ export default function LoginPage() {
     router.push("/signup");
   };
 
+  const MainScreen = () => {
+    router.push("/main");
+  }
+
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-emerald-100 pt-9 pb-9 pl-22 pr-22">
       <div className="bg-white rounded-2xl shadow-lg w-330 h-143 flex">
@@ -38,7 +42,7 @@ export default function LoginPage() {
             Forgot Password?
           </p>
           <div className="pb-8">
-            <button className="w-full bg-black text-white py-2 rounded mt-4">
+            <button className="w-full bg-black text-white py-2 rounded mt-4" onClick={MainScreen}>
               Sign In
             </button>
           </div>

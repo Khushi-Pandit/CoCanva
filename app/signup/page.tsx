@@ -8,6 +8,10 @@ export default function SignUpPage() {
     router.push("/login");
   };
 
+  const MainScreen = () => {
+    router.push("/main");
+  }
+
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-emerald-100 pt-9 pb-9 pl-22 pr-22">
       <div className="bg-white rounded-2xl shadow-lg w-330 h-143 flex">
@@ -20,6 +24,7 @@ export default function SignUpPage() {
             />
           </div>
         </div>
+
         <div className="w-1/2 pt-5 pl-25 pr-25 pb-7">
           <h1 className="flex items-center justify-center text-[30px] pb-5 text-black">
             Create Your Account
@@ -45,7 +50,7 @@ export default function SignUpPage() {
             className="w-full mb-4 p-2 border border-gray-300 rounded"
           />
           <div className="pb-4">
-            <button className="w-full bg-black text-white py-2 rounded mt-4">
+            <button className="w-full bg-black text-white py-2 rounded mt-4" onClick={MainScreen}>
               Sign Up
             </button>
           </div>
