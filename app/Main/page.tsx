@@ -231,7 +231,7 @@ export default function MainScreen() {
                   ))}
                 </div>
                 <p className="text-sm mb-2 text-white/90">
-                  "{testimonial.text}"
+                  {testimonial.text}
                 </p>
                 <div className="text-xs text-white/70">
                   <div className="font-semibold">{testimonial.name}</div>
