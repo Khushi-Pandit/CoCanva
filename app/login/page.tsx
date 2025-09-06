@@ -1,22 +1,53 @@
 "use client";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useState } from "react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const SignUp = () => {
     router.push("/signup");
   };
 
-  const MainScreen = () => {
-    router.push("/Main");
-  };
+  // ✅ Handle login with backend API
+  const handleLogin = async () => {
+  setError("");
+  setLoading(true);
+
+  try {
+    const res = await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error || "Login failed");
+    } else {
+      localStorage.setItem("user", JSON.stringify(data.user));
+      router.push("/Main");
+    }
+  } catch (err) {
+    console.error("Login error:", err);
+    setError("Something went wrong");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-emerald-100 pt-9 pb-9 pl-22 pr-22">
       <div className="bg-white rounded-2xl shadow-lg w-330 h-143 flex">
         
+        {/* Left side image */}
         <div className="w-1/2 bg-emerald-200 rounded-l-2xl overflow-hidden">
           <div className="relative flex items-center justify-center h-full">
             <Image
@@ -29,6 +60,7 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {/* Right side form */}
         <div className="w-1/2 pt-13 pl-25 pr-25 pb-20">
           <h1 className="flex items-center justify-center text-[30px] pb-10 text-black">
             IdeaSplash
@@ -38,13 +70,21 @@ export default function LoginPage() {
           <input
             type="text"
             className="w-full mt-1 mb-4 p-2 border border-gray-300 rounded"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
 
           <p className="text-[14px] text-gray-500">Password</p>
           <input
             type="password"
             className="w-full mt-1 mb-1 p-2 border border-gray-300 rounded"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
           />
+
+          {error && (
+            <p className="text-red-500 text-sm mt-2 mb-2">{error}</p>
+          )}
 
           <p className="text-[13px] text-green-500 flex justify-end underline">
             Forgot Password?
@@ -53,9 +93,10 @@ export default function LoginPage() {
           <div className="pb-8">
             <button
               className="w-full bg-black text-white py-2 rounded mt-4"
-              onClick={MainScreen}
+              onClick={handleLogin}
+              disabled={loading}
             >
-              Sign In
+              {loading ? "Signing In..." : "Sign In"}
             </button>
           </div>
 
