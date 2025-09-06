@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   });
 }
 
-
+//kindly add for the backend work
 // import { NextResponse } from "next/server";
 
 // // POST login with default values
