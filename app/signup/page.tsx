@@ -1,5 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -60,10 +61,17 @@ export default function SignUpPage() {
             <hr className="flex-grow border-t border-gray-300" />
           </div>
           <div className="flex items-center justify-center mt-4">
-            <button className="text-[13px] text-black px-4 py-2 rounded">
-              Sign up with Google
-            </button>
-          </div>
+                      <button className="flex items-center gap-2 text-[13px] text-black px-4 py-2 rounded border border-gray-300 bg-white hover:bg-gray-100 transition">
+                        <Image
+                          src="/images/googleIcon.png" // your Google icon path
+                          alt="Google Icon"
+                          width={16}
+                          height={16}
+                          className="w-4 h-4"
+                        />
+                        Sign in with Google
+                      </button>
+                    </div>
           <div className="flex justify-center gap-1 text-[13px] text-black mt-2">
             <p>Already have an account?</p>
             <p className="text-green-500 underline cursor-pointer">
