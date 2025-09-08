@@ -16,48 +16,44 @@ export default function LoginPage() {
 
   // ✅ Handle login with backend API
   const handleLogin = async () => {
-  setError("");
-  setLoading(true);
+    setError("");
+    setLoading(true);
 
-  try {
-    const res = await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      setError(data.error || "Login failed");
-    } else {
-      localStorage.setItem("user", JSON.stringify(data.user));
-      router.push("/Main");
+      if (!res.ok) {
+        setError(data.error || "Login failed");
+      } else {
+        localStorage.setItem("user", JSON.stringify(data.user));
+        router.push("/Main");
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("Something went wrong");
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error("Login error:", err);
-    setError("Something went wrong");
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-emerald-100 pt-9 pb-9 pl-22 pr-22">
       <div className="bg-white rounded-2xl shadow-lg w-330 h-143 flex">
-        
         {/* Left side image */}
-        <div className="w-1/2 bg-emerald-200 rounded-l-2xl overflow-hidden">
-          <div className="relative flex items-center justify-center h-full">
-            <Image
-              src="/images/login.gif"
-              alt="Login Image"
-              fill
-              className="object-cover text-white"
-              priority
-            />
-          </div>
+        <div className="w-1/2 bg-emerald-200 rounded-l-2xl flex items-center justify-center">
+          <Image
+            src="/images/login.png"
+            alt="Login Image"
+            width={400}
+            height={400}
+            className="object-contain"
+          />
         </div>
 
         {/* Right side form */}
@@ -82,15 +78,13 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
           />
 
-          {error && (
-            <p className="text-red-500 text-sm mt-2 mb-2">{error}</p>
-          )}
+          {error && <p className="text-red-500 text-sm mt-2 mb-2">{error}</p>}
 
           <p className="text-[13px] text-green-500 flex justify-end underline">
             Forgot Password?
           </p>
 
-          <div className="pb-8">
+          <div className="pb-5">
             <button
               className="w-full bg-black text-white py-2 rounded mt-4"
               onClick={handleLogin}
@@ -107,7 +101,14 @@ export default function LoginPage() {
           </div>
 
           <div className="flex items-center justify-center mt-4">
-            <button className="text-[13px] text-black px-4 py-2 rounded">
+            <button className="flex items-center gap-2 text-[13px] text-black px-4 py-2 rounded border border-gray-300 bg-white hover:bg-gray-100 transition">
+              <Image
+                src="/images/googleIcon.png" // your Google icon path
+                alt="Google Icon"
+                width={16}
+                height={16}
+                className="w-4 h-4"
+              />
               Sign in with Google
             </button>
           </div>
