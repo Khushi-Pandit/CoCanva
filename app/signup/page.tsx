@@ -1,6 +1,9 @@
 "use client";
 import { useRouter } from "next/navigation";
+import { Poppins, Roboto } from "next/font/google";
 import Image from "next/image";
+
+const roboto = Roboto({ subsets: ["latin"], weight: ["400", "500"] });
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -11,19 +14,19 @@ export default function SignUpPage() {
 
   const MainScreen = () => {
     router.push("/main");
-  }
+  };
 
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-emerald-100 pt-9 pb-9 pl-22 pr-22">
       <div className="bg-white rounded-2xl shadow-lg w-330 h-143 flex">
-        <div className="w-1/2 bg-emerald-200 rounded-l-2xl overflow-hidden">
-          <div className="flex items-center justify-center h-full">
-            <img
-              src="/images/signup.gif"
-              alt="Sign Up Image"
-              className="w-full h-full object-cover text-white"
-            />
-          </div>
+        <div className="w-full md:w-1/2 bg-emerald-200 flex flex-col items-center justify-center p-6">
+          <Image
+            src="/images/login.png"
+            alt="Login Illustration"
+            width={400}
+            height={400}
+            className="object-contain"
+          />
         </div>
 
         <div className="w-1/2 pt-5 pl-25 pr-25 pb-7">
@@ -51,7 +54,10 @@ export default function SignUpPage() {
             className="w-full mb-4 p-2 border border-gray-300 rounded"
           />
           <div className="pb-4">
-            <button className="w-full bg-black text-white py-2 rounded mt-4" onClick={MainScreen}>
+            <button
+              className="w-full bg-black text-white py-2 rounded mt-4"
+              onClick={MainScreen}
+            >
               Sign Up
             </button>
           </div>
@@ -61,17 +67,17 @@ export default function SignUpPage() {
             <hr className="flex-grow border-t border-gray-300" />
           </div>
           <div className="flex items-center justify-center mt-4">
-                      <button className="flex items-center gap-2 text-[13px] text-black px-4 py-2 rounded border border-gray-300 bg-white hover:bg-gray-100 transition">
-                        <Image
-                          src="/images/googleIcon.png" // your Google icon path
-                          alt="Google Icon"
-                          width={16}
-                          height={16}
-                          className="w-4 h-4"
-                        />
-                        Sign in with Google
-                      </button>
-                    </div>
+            <button className="flex items-center gap-2 text-[13px] text-black px-4 py-2 rounded border border-gray-300 bg-white hover:bg-gray-100 transition">
+              <Image
+                src="/images/googleIcon.png" // your Google icon path
+                alt="Google Icon"
+                width={16}
+                height={16}
+                className="w-4 h-4"
+              />
+              Sign in with Google
+            </button>
+          </div>
           <div className="flex justify-center gap-1 text-[13px] text-black mt-2">
             <p>Already have an account?</p>
             <p className="text-green-500 underline cursor-pointer">
