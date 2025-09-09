@@ -21,7 +21,10 @@ export async function POST(req: Request) {
 
   const existing = await User.findOne({ email });
   if (existing) {
-    return NextResponse.json({ error: "Email already registered" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Email already registered" },
+      { status: 400 }
+    );
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -29,5 +32,8 @@ export async function POST(req: Request) {
   const newUser = new User({ name, email, password: hashedPassword });
   await newUser.save();
 
-  return NextResponse.json({ message: "User created successfully", user: { name, email } });
+  return NextResponse.json({
+    message: "User created successfully",
+    user: { name, email },
+  });
 }

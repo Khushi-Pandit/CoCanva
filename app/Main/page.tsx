@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import {useRouter} from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
   Sparkles,
@@ -47,34 +47,26 @@ export default function MainScreen() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentFeature((prev) => (prev + 1) % features.length);
-    }, 2000);
+    }, 2500);
     return () => clearInterval(interval);
   }, []);
 
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-600 via-teal-500 to-cyan-500 text-white overflow-hidden relative">
+    <div className="min-h-screen bg-gradient-to-br from-green-200 via-mint-200 to-cyan-400 text-gray-900 overflow-hidden relative">
       {/* Floating Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute w-96 h-96 bg-white/10 rounded-full blur-3xl"
-          animate={{
-            x: [0, 100, 0],
-            y: [0, -50, 0],
-            scale: [1, 1.2, 1],
-          }}
-          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-          style={{ top: "10%", left: "10%" }}
+          className="absolute w-[28rem] h-[28rem] bg-cyan-300/30 rounded-full blur-3xl"
+          animate={{ x: [0, 100, 0], y: [0, -80, 0], scale: [1, 1.15, 1] }}
+          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+          style={{ top: "15%", left: "10%" }}
         />
         <motion.div
-          className="absolute w-72 h-72 bg-amber-300/20 rounded-full blur-2xl"
-          animate={{
-            x: [0, -80, 0],
-            y: [0, 100, 0],
-            scale: [1, 0.8, 1],
-          }}
-          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute w-[22rem] h-[22rem] bg-green-300/30 rounded-full blur-2xl"
+          animate={{ x: [0, -100, 0], y: [0, 100, 0], scale: [1, 0.85, 1] }}
+          transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
           style={{ bottom: "20%", right: "15%" }}
         />
       </div>
@@ -82,34 +74,27 @@ export default function MainScreen() {
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Navigation */}
         <motion.nav
-          className="flex justify-between items-center p-6 md:p-8"
+          className="flex justify-between items-center p-6 md:p-10"
           initial={{ y: -50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.8 }}
         >
           <div className="flex items-center space-x-2">
-            <Palette className="w-8 h-8" />
-            <span className="text-2xl font-bold">CanvasPro</span>
+            <Palette className="w-8 h-8 text-cyan-500" />
+            <span className="text-2xl font-bold tracking-tight">Canvasly</span>
           </div>
-          <div className="flex space-x-6">
-            <button className="hover:text-amber-300 transition-colors">
-              Templates
-            </button>
-            <button className="hover:text-amber-300 transition-colors">
-              Features
-            </button>
-            <button className="hover:text-amber-300 transition-colors">
-              Pricing
-            </button>
-            <button className="px-4 py-2 bg-white text-emerald-600 rounded-lg hover:bg-amber-100 transition-all">
+          <div className="flex space-x-8 text-sm md:text-base">
+            <button className="hover:text-cyan-600 transition-colors">Templates</button>
+            <button className="hover:text-cyan-600 transition-colors">Features</button>
+            <button className="hover:text-cyan-600 transition-colors">Pricing</button>
+            <button className="px-4 py-2 bg-cyan-500 text-white font-semibold rounded-lg hover:bg-cyan-600 transition-all">
               Sign In
             </button>
           </div>
         </motion.nav>
 
-        {/* Main Content */}
+        {/* Hero Section */}
         <div className="flex-1 flex flex-col items-center justify-center px-6 md:px-12 text-center">
-          {/* Hero Section */}
           <motion.div
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -117,38 +102,37 @@ export default function MainScreen() {
             className="max-w-4xl"
           >
             <motion.h1
-              className="text-5xl md:text-7xl font-extrabold mb-6 leading-tight"
+              className="text-5xl md:text-7xl font-extrabold mb-6 leading-tight text-gray-900"
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               transition={{ duration: 0.8, delay: 0.5 }}
             >
-              <span className="inline-block">✨ Turn Your</span>
+              <span className="inline-block">✨ Turn Ideas Into Reality</span>
               <br />
-              <span className="bg-gradient-to-r from-amber-300 to-emerald-300 bg-clip-text text-transparent">
-                Ideas Into Magic
+              <span className="bg-gradient-to-r from-cyan-500 to-green-500 bg-clip-text text-transparent">
+                With Canvasly
               </span>
             </motion.h1>
 
             <motion.p
-              className="text-xl md:text-2xl mb-8 text-white/90 font-light max-w-2xl mx-auto"
+              className="text-lg md:text-2xl mb-8 text-gray-700 font-light max-w-2xl mx-auto"
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.7 }}
             >
-              Create stunning designs, presentations, and content with our
-              intuitive drag-and-drop editor. No design experience needed.
+              Create beautiful designs, presentations, and content with an intuitive editor that makes creativity effortless.
             </motion.p>
 
             {/* Dynamic Feature Text */}
             <motion.div
-              className="mb-8 h-8"
+              className="mb-10 h-8"
               key={currentFeature}
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: -20, opacity: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <span className="text-lg text-amber-300 font-semibold">
+              <span className="text-lg text-cyan-600 font-semibold tracking-wide">
                 → {features[currentFeature]}
               </span>
             </motion.div>
@@ -156,24 +140,24 @@ export default function MainScreen() {
 
           {/* Action Buttons */}
           <motion.div
-            className="flex flex-col sm:flex-row gap-6 mb-12"
+            className="flex flex-col sm:flex-row gap-6 mb-14"
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.9 }}
           >
             <motion.button
-              className="group px-8 py-4 bg-white text-emerald-600 font-bold rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 flex items-center space-x-2"
+              className="group px-8 py-4 bg-cyan-500 text-white font-bold rounded-2xl shadow-lg hover:bg-cyan-600 transition-all duration-300 flex items-center space-x-2"
               whileHover={{ scale: 1.05, y: -2 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => router.push("/next-page")}
             >
               <Sparkles className="w-5 h-5" />
-              <span>Start Creating Free</span>
+              <span>Start Free</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </motion.button>
 
             <motion.button
-              className="group px-8 py-4 bg-transparent border-2 border-white/80 font-bold rounded-2xl hover:bg-white hover:text-emerald-600 transition-all duration-300 flex items-center space-x-2"
+              className="group px-8 py-4 bg-transparent border-2 border-cyan-600 text-cyan-600 font-bold rounded-2xl hover:bg-cyan-600 hover:text-white transition-all duration-300 flex items-center space-x-2"
               whileHover={{ scale: 1.05, y: -2 }}
               whileTap={{ scale: 0.98 }}
             >
@@ -184,21 +168,21 @@ export default function MainScreen() {
 
           {/* Quick Stats */}
           <motion.div
-            className="flex flex-wrap justify-center gap-8 mb-12 text-sm"
+            className="flex flex-wrap justify-center gap-8 mb-12 text-sm md:text-base text-gray-800"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8, delay: 1.1 }}
           >
             <div className="flex items-center space-x-2">
-              <Users className="w-4 h-4 text-amber-300" />
+              <Users className="w-5 h-5 text-cyan-600" />
               <span>10M+ Active Users</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Zap className="w-4 h-4 text-amber-300" />
+              <Zap className="w-5 h-5 text-cyan-600" />
               <span>500K+ Templates</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Star className="w-4 h-4 text-amber-300" />
+              <Star className="w-5 h-5 text-cyan-600" />
               <span>4.9★ Rating</span>
             </div>
           </motion.div>
@@ -206,34 +190,34 @@ export default function MainScreen() {
 
         {/* Testimonials Section */}
         <motion.div
-          className="pb-12 px-6"
+          className="pb-16 px-6"
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.8, delay: 1.3 }}
         >
-          <h3 className="text-center text-lg font-semibold mb-6 text-white/90">
-            Trusted by creators worldwide
+          <h3 className="text-center text-lg md:text-xl font-semibold mb-8 text-gray-800">
+            Trusted by creators worldwide 🌍
           </h3>
-          <div className="flex flex-wrap justify-center gap-6 max-w-4xl mx-auto">
+          <div className="flex flex-wrap justify-center gap-6 max-w-5xl mx-auto">
             {testimonials.map((testimonial, index) => (
               <motion.div
                 key={index}
-                className="bg-white/10 backdrop-blur-sm rounded-xl p-4 max-w-xs"
-                whileHover={{ scale: 1.02, y: -2 }}
+                className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 max-w-sm shadow-md border border-cyan-100"
+                whileHover={{ scale: 1.03, y: -3 }}
                 transition={{ duration: 0.2 }}
               >
-                <div className="flex mb-2">
+                <div className="flex mb-3">
                   {[...Array(testimonial.rating)].map((_, i) => (
                     <Star
                       key={i}
-                      className="w-4 h-4 fill-amber-300 text-amber-300"
+                      className="w-4 h-4 fill-cyan-500 text-cyan-500"
                     />
                   ))}
                 </div>
-                <p className="text-sm mb-2 text-white/90">
-                  {testimonial.text}
+                <p className="text-base mb-3 text-gray-700 italic">
+                  “{testimonial.text}”
                 </p>
-                <div className="text-xs text-white/70">
+                <div className="text-sm text-gray-600">
                   <div className="font-semibold">{testimonial.name}</div>
                   <div>{testimonial.role}</div>
                 </div>
