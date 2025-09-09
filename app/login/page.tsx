@@ -18,54 +18,61 @@ export default function LoginPage() {
   const SignUp = () => {
     router.push("/signup");
   };
+  const handleLogin = () => {
+    router.push("/Main");
+  }
 
   // ✅ Handle login with backend API
-  const handleLogin = async () => {
-    setError("");
-    setLoading(true);
+  // const handleLogin = async () => {
+  //   setError("");
+  //   setLoading(true);
 
-    try {
-      const res = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+  //   try {
+  //     const res = await fetch("/api/auth", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ email, password }),
+  //     });
 
-      const data = await res.json();
+  //     const data = await res.json();
 
-      if (!res.ok) {
-        setError(data.error || "Login failed");
-      } else {
-        localStorage.setItem("user", JSON.stringify(data.user));
-        router.push("/Main");
-      }
-    } catch (err) {
-      console.error("Login error:", err);
-      setError("Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  };
+  //     if (!res.ok) {
+  //       setError(data.error || "Login failed");
+  //     } else {
+  //       localStorage.setItem("user", JSON.stringify(data.user));
+  //       router.push("/Main");
+  //     }
+  //   } catch (err) {
+  //     console.error("Login error:", err);
+  //     setError("Something went wrong");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-emerald-100 pt-9 pb-9 pl-22 pr-22">
       <div className="bg-white rounded-2xl shadow-lg w-330 h-143 flex">
         {/* Left side image */}
         <div className="w-full md:w-1/2 bg-emerald-200 flex flex-col items-center justify-center p-6">
-            <Image
-              src="/images/login.png"
-              alt="Login Illustration"
-              width={400}
-              height={400}
-              className="object-contain"
-            />
-            <p className={`${roboto.className} text-center text-gray-700 mt-4 text-xl px-4`}>
-              Turn your ideas into reality with Canvasly!
-            </p>
-            <p className={`${roboto.className} text-center text-gray-600 mt-2 text-sm px-4`}>
-              Brainstorm. Plan. Achieve. Your creativity starts here.
-            </p>
-          </div>
+          <Image
+            src="/images/login.png"
+            alt="Login Illustration"
+            width={400}
+            height={400}
+            className="object-contain"
+          />
+          <p
+            className={`${roboto.className} text-center text-gray-700 mt-4 text-xl px-4`}
+          >
+            Turn your ideas into reality with Canvasly!
+          </p>
+          <p
+            className={`${roboto.className} text-center text-gray-600 mt-2 text-sm px-4`}
+          >
+            Brainstorm. Plan. Achieve. Your creativity starts here.
+          </p>
+        </div>
 
         {/* Right side form */}
         <div className="w-1/2 pt-13 pl-25 pr-25 pb-20">
