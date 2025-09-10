@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useState } from "react";
 import { Poppins, Roboto } from "next/font/google";
+import { Eye, EyeOff } from "lucide-react"; // 👈 install: npm i lucide-react
 
 // Google Fonts
 const poppins = Poppins({ subsets: ["latin"], weight: ["400", "600", "700"] });
@@ -14,41 +15,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const SignUp = () => {
     router.push("/signup");
   };
   const handleLogin = () => {
     router.push("/Main");
-  }
-
-  // ✅ Handle login with backend API
-  // const handleLogin = async () => {
-  //   setError("");
-  //   setLoading(true);
-
-  //   try {
-  //     const res = await fetch("/api/auth", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({ email, password }),
-  //     });
-
-  //     const data = await res.json();
-
-  //     if (!res.ok) {
-  //       setError(data.error || "Login failed");
-  //     } else {
-  //       localStorage.setItem("user", JSON.stringify(data.user));
-  //       router.push("/Main");
-  //     }
-  //   } catch (err) {
-  //     console.error("Login error:", err);
-  //     setError("Something went wrong");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
+  };
 
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-emerald-100 pt-9 pb-9 pl-22 pr-22">
@@ -83,18 +57,29 @@ export default function LoginPage() {
           <p className="text-[14px] text-gray-500">Username or Email</p>
           <input
             type="text"
-            className="w-full mt-1 mb-4 p-2 border border-gray-300 rounded"
+            className="w-full mt-1 mb-4 p-2 border border-gray-300 rounded text-black focus:outline-none focus:ring-1 focus:ring-gray-400"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
 
           <p className="text-[14px] text-gray-500">Password</p>
-          <input
-            type="password"
-            className="w-full mt-1 mb-1 p-2 border border-gray-300 rounded"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              className="w-full mt-1 mb-1 p-2 border border-gray-300 rounded text-black focus:outline-none focus:ring-1 focus:ring-gray-400 pr-10"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            {password.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            )}
+          </div>
 
           {error && <p className="text-red-500 text-sm mt-2 mb-2">{error}</p>}
 
@@ -121,7 +106,7 @@ export default function LoginPage() {
           <div className="flex items-center justify-center mt-4">
             <button className="flex items-center gap-2 text-[13px] text-black px-4 py-2 rounded border border-gray-300 bg-white hover:bg-gray-100 transition">
               <Image
-                src="/images/googleIcon.png" // your Google icon path
+                src="/images/googleIcon.png"
                 alt="Google Icon"
                 width={16}
                 height={16}
