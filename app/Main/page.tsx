@@ -149,7 +149,7 @@ export default function MainScreen() {
               className="group px-8 py-4 bg-cyan-500 text-white font-bold rounded-2xl shadow-lg hover:bg-cyan-600 transition-all duration-300 flex items-center space-x-2"
               whileHover={{ scale: 1.05, y: -2 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => router.push("/next-page")}
+              onClick={() => router.push("/canvas")}
             >
               <Sparkles className="w-5 h-5" />
               <span>Start Free</span>
