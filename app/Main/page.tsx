@@ -162,7 +162,7 @@ export default function MainScreen() {
               whileTap={{ scale: 0.98 }}
             >
               <Play className="w-5 h-5" />
-              <span>Watch Demo</span>
+              <span>Previous Work</span>
             </motion.button>
           </motion.div>
 
