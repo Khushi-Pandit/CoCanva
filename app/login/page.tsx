@@ -2,11 +2,10 @@
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useState } from "react";
-import { Poppins, Roboto } from "next/font/google";
-import { Eye, EyeOff } from "lucide-react"; // 👈 install: npm i lucide-react
+import { Roboto } from "next/font/google";
+import { Eye, EyeOff } from "lucide-react";
 
 // Google Fonts
-const poppins = Poppins({ subsets: ["latin"], weight: ["400", "600", "700"] });
 const roboto = Roboto({ subsets: ["latin"], weight: ["400", "500"] });
 
 export default function LoginPage() {
@@ -25,10 +24,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-screen flex items-center justify-center bg-emerald-100 pt-9 pb-9 pl-22 pr-22">
+    <div className="min-h-screen w-full flex justify-center bg-emerald-100 pt-9 pb-9 pl-22 pr-22 align-items-center">
       <div className="bg-white rounded-2xl shadow-lg w-330 h-143 flex">
         {/* Left side image */}
-        <div className="w-full md:w-1/2 bg-emerald-200 flex flex-col items-center justify-center p-6">
+        <div className="w-full md:w-1/2 bg-emerald-200 flex flex-col items-center justify-center p-6 rounded-l-2xl">
           <Image
             src="/images/login.png"
             alt="Login Illustration"

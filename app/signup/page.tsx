@@ -42,7 +42,7 @@ export default function SignUpPage() {
         </div>
 
         {/* Right side form */}
-        <div className="w-1/2 pt-5 pl-25 pr-25 pb-7">
+        <div className="w-1/2 pt-13 pl-25 pr-25 pb-7">
           <h1 className="flex items-center justify-center text-[30px] pb-5 text-black">
             Create Your Account
           </h1>
@@ -116,14 +116,14 @@ export default function SignUpPage() {
           </div>
 
           {/* Divider */}
-          <div className="flex items-center gap-4">
+          {/* <div className="flex items-center gap-4">
             <hr className="flex-grow border-t border-gray-300" />
             <span className="text-gray-500 text-sm">OR</span>
             <hr className="flex-grow border-t border-gray-300" />
-          </div>
+          </div> */}
 
           {/* Google Sign In */}
-          <div className="flex items-center justify-center mt-4">
+          {/* <div className="flex items-center justify-center mt-4">
             <button className="flex items-center gap-2 text-[13px] text-black px-4 py-2 rounded border border-gray-300 bg-white hover:bg-gray-100 transition">
               <Image
                 src="/images/googleIcon.png"
@@ -134,7 +134,7 @@ export default function SignUpPage() {
               />
               Sign in with Google
             </button>
-          </div>
+          </div> */}
 
           {/* Already have account */}
           <div className="flex justify-center gap-1 text-[13px] text-black mt-2">
