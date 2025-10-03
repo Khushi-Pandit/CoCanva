@@ -31,7 +31,7 @@ export default function SignUpPage() {
     <div className="min-h-screen w-screen flex items-center justify-center bg-emerald-100 pt-9 pb-9 pl-22 pr-22">
       <div className="bg-white rounded-2xl shadow-lg w-330 h-143 flex">
         {/* Left side image */}
-        <div className="w-full md:w-1/2 bg-emerald-200 flex flex-col items-center justify-center p-6">
+        <div className="w-full md:w-1/2 bg-emerald-200 flex flex-col items-center justify-center p-6 rounded-l-2xl">
           <Image
             src="/images/login.png"
             alt="Login Illustration"
