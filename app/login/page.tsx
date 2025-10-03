@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -5,23 +6,64 @@ import { useState } from "react";
 import { Roboto } from "next/font/google";
 import { Eye, EyeOff } from "lucide-react";
 
-// Google Fonts
 const roboto = Roboto({ subsets: ["latin"], weight: ["400", "500"] });
+
+type LoginResponse = {
+  success: boolean;
+  token?: string;
+  error?: string;
+};
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const SignUp = () => {
     router.push("/signup");
   };
-  const handleLogin = () => {
-    
-    router.push("/Main");
+
+  const handleLogin = async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Something went wrong");
+        return null;
+      }
+
+      // store token in localStorage or cookie
+      if (data.token) localStorage.setItem("token", data.token);
+
+      // Redirect or do something with user
+      router.push("/Main"); // optional: redirect after login
+
+      return data.user;
+    } catch (err: any) {
+      setError(err.message || "Network Error");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleLogin(email, password);
   };
 
   return (
@@ -89,11 +131,31 @@ export default function LoginPage() {
 
           <div className="pb-5">
             <button
-              className="w-full bg-black text-white py-2 rounded mt-4"
-              onClick={handleLogin}
+              type="submit"
+              className="w-full bg-black text-white py-2 rounded mt-4 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={loading}
+              onClick={onSubmit}
             >
-              {loading ? "Signing In..." : "Sign In"}
+              {loading ? (
+                <>
+                  <svg
+                    className="animate-spin h-5 w-5 mr-2 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    ></path>
+                  </svg>
+                  Signing In...
+                </>
+              ) : (
+                "Sign In"
+              )}
             </button>
           </div>
 
