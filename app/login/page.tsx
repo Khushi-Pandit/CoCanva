@@ -8,12 +8,6 @@ import { Eye, EyeOff } from "lucide-react";
 
 const roboto = Roboto({ subsets: ["latin"], weight: ["400", "500"] });
 
-type LoginResponse = {
-  success: boolean;
-  token?: string;
-  error?: string;
-};
-
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
