@@ -20,6 +20,7 @@ export default function LoginPage() {
     router.push("/signup");
   };
   const handleLogin = () => {
+    
     router.push("/Main");
   };
 
@@ -53,7 +54,7 @@ export default function LoginPage() {
             Canvasly
           </h1>
 
-          <p className="text-[14px] text-gray-500">Username or Email</p>
+          <p className="text-[14px] text-gray-500">Email</p>
           <input
             type="text"
             className="w-full mt-1 mb-4 p-2 border border-gray-300 rounded text-black focus:outline-none focus:ring-1 focus:ring-gray-400"
