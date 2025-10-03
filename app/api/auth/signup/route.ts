@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(req: NextRequest) {
     try {
         const {fullName, email, password, confirmPassword} : {fullName: string | null; email : string | null; password: string | null; confirmPassword : string | null} = await req.json();
-        if(!email || ! password || !fullName || !confirmPassword){
+        if(!email || !password || !fullName || !confirmPassword){
             return NextResponse.json({ error: "Input fields missing" }, { status: 400 });
         }
         const user = await User.findOne({email});

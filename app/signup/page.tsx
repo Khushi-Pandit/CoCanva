@@ -1,30 +1,75 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Poppins, Roboto } from "next/font/google";
 import Image from "next/image";
-import { Eye, EyeOff } from "lucide-react"; // 👈 install: npm i lucide-react
+import { Eye, EyeOff } from "lucide-react";
 
-// Google Fonts
-const poppins = Poppins({ subsets: ["latin"], weight: ["400", "600", "700"] });
-const roboto = Roboto({ subsets: ["latin"], weight: ["400", "500"] });
-
-export default function SignUpPage() {
+export default function SignUp() {
   const router = useRouter();
-
-  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const goToLogin = () => {
     router.push("/login");
   };
 
-  const MainScreen = () => {
-    router.push("/main");
+  const handleSignUp = async (email: string, fullName: string, password: string, confirmPassword: string) => {
+    setLoading(true);
+    setError(null);
+
+    if (!fullName || !email || !password || !confirmPassword) {
+      setError("All fields are required");
+      setLoading(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ fullName, email, password, confirmPassword }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        // Server can send either 'error' or 'message'
+        setError(data.error || data.message || "Something went wrong");
+        return;
+      }
+
+      // Store token if returned
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
+
+      // Redirect after successful signup
+      router.push("/Main");
+    } catch (err: any) {
+      setError(err?.message || "Network Error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSignUp(email, fullName, password, confirmPassword);
   };
 
   return (
@@ -42,7 +87,7 @@ export default function SignUpPage() {
         </div>
 
         {/* Right side form */}
-        <div className="w-1/2 pt-13 pl-25 pr-25 pb-7">
+        <div className="w-1/2 pt-11 pl-25 pr-25 pb-7">
           <h1 className="flex items-center justify-center text-[30px] pb-5 text-black">
             Create Your Account
           </h1>
@@ -105,13 +150,36 @@ export default function SignUpPage() {
             )}
           </div>
 
+          {error && <p className="text-red-500 text-sm mt-2 mb-2">{error}</p>}
+
           {/* Sign Up Button */}
-          <div className="pb-4">
+          <div className="pb-5">
             <button
-              className="w-full bg-black text-white py-2 rounded mt-4"
-              onClick={MainScreen}
+              type="submit"
+              className="w-full bg-black text-white py-2 rounded mt-4 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading}
+              onClick={onSubmit}
             >
-              Sign Up
+              {loading ? (
+                <>
+                  <svg
+                    className="animate-spin h-5 w-5 mr-2 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    ></path>
+                  </svg>
+                  Signing Up...
+                </>
+              ) : (
+                "Sign Up"
+              )}
             </button>
           </div>
 
