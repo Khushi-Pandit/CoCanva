@@ -16,6 +16,11 @@ import {
 export default function MainScreen() {
   const [currentFeature, setCurrentFeature] = useState(0);
 
+  const router = useRouter();
+  const canvasPage = () => {
+    router.push("/canvas");
+  };
+
   const features = [
     "Professional Templates",
     "Drag & Drop Editor",
@@ -51,8 +56,6 @@ export default function MainScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  const router = useRouter();
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-200 via-mint-200 to-cyan-400 text-gray-900 overflow-hidden relative">
       {/* Floating Background Elements */}
@@ -84,9 +87,15 @@ export default function MainScreen() {
             <span className="text-2xl font-bold tracking-tight">Canvasly</span>
           </div>
           <div className="flex space-x-8 text-sm md:text-base">
-            <button className="hover:text-cyan-600 transition-colors">Templates</button>
-            <button className="hover:text-cyan-600 transition-colors">Features</button>
-            <button className="hover:text-cyan-600 transition-colors">Pricing</button>
+            <button className="hover:text-cyan-600 transition-colors">
+              Templates
+            </button>
+            <button className="hover:text-cyan-600 transition-colors">
+              Features
+            </button>
+            <button className="hover:text-cyan-600 transition-colors">
+              Pricing
+            </button>
             <button className="px-4 py-2 bg-cyan-500 text-white font-semibold rounded-lg hover:bg-cyan-600 transition-all">
               Sign In
             </button>
@@ -120,7 +129,8 @@ export default function MainScreen() {
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.7 }}
             >
-              Create beautiful designs, presentations, and content with an intuitive editor that makes creativity effortless.
+              Create beautiful designs, presentations, and content with an
+              intuitive editor that makes creativity effortless.
             </motion.p>
 
             {/* Dynamic Feature Text */}
@@ -145,17 +155,19 @@ export default function MainScreen() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.9 }}
           >
+            {/* Start Free → Canvas Page */}
             <motion.button
               className="group px-8 py-4 bg-cyan-500 text-white font-bold rounded-2xl shadow-lg hover:bg-cyan-600 transition-all duration-300 flex items-center space-x-2"
               whileHover={{ scale: 1.05, y: -2 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => router.push("/next-page")}
+              onClick={canvasPage} // ✅ navigation fixed
             >
               <Sparkles className="w-5 h-5" />
               <span>Start Free</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </motion.button>
 
+            {/* Previous Work Button */}
             <motion.button
               className="group px-8 py-4 bg-transparent border-2 border-cyan-600 text-cyan-600 font-bold rounded-2xl hover:bg-cyan-600 hover:text-white transition-all duration-300 flex items-center space-x-2"
               whileHover={{ scale: 1.05, y: -2 }}
