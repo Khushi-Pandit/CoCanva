@@ -1,3 +1,6 @@
+// UI fix for the canvas page done, adding required and functioning things, again pushed because already got pushed in backend (by mistake).
+
+
 "use client";
 
 import { useEffect, useRef, useState } from "react";
