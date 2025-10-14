@@ -1,3 +1,5 @@
+// CanvasScreen - A React component for a drawing canvas with multiple tools, using react-konva and TypeScript.
+
 "use client";
 
 import { useEffect, useRef, useState } from "react";
