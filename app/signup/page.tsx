@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Image from "next/image";
 import { Eye, EyeOff } from "lucide-react";
+import { signup } from "../firebase/authservice";
 
 export default function SignUp() {
   const router = useRouter();
@@ -41,14 +42,22 @@ export default function SignUp() {
       return;
     }
 
-
     try {
-      const res = await fetch("/api/auth/signup", {
+      const userCredential = await signup(email, password, fullName);
+      const token = await userCredential.user.getIdToken();
+      console.log("Signup response data:", userCredential.user.displayName);
+
+      const res = await fetch("http://localhost:4000/api/v1/user/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ fullName, email, password, confirmPassword }),
+        body: JSON.stringify({
+          fullName: fullName,
+          email,
+          token: token,
+          fId: userCredential.user.uid,
+        }),
       });
 
       const data = await res.json();
@@ -58,10 +67,8 @@ export default function SignUp() {
         setError(data.error || data.message || "Something went wrong");
         return;
       }
+      localStorage.setItem("token", token);
 
-      if (data.token) {
-        localStorage.setItem("token", data.token);
-      }
       router.push("/Main");
     } catch (err: any) {
       setError(err?.message || "Network Error");

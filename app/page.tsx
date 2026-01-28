@@ -1,10 +1,10 @@
-import SignUp from "./signup/page";
+import CanvasPage from "./canva/page";
 
 export default function HomePage() {
   return (
     <main>
       <div>
-        <SignUp />
+        <CanvasPage />
       </div>
     </main>
   );
