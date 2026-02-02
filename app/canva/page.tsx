@@ -1,141 +1,195 @@
-"use client";
-import React, { useEffect, useRef, useState } from "react";
-import {
-  Stage,
-  Layer,
-  Line,
-  Rect,
-} from "react-konva";
-import type Konva from "konva";
-import {
-  Pencil, Highlighter, Eraser,
-} from "lucide-react";
+'use client';
 
+import React, { useRef, useState, useEffect } from 'react';
+import { Undo2, Redo2, Pencil } from 'lucide-react';
 
-type Tool = "pencil" | "highlighter" | "eraser";
-
-interface BaseShape {
-  id: string;
-  tool: Tool;
+type Point = { x: number; y: number };
+type Line = {
+  points: Point[];
   color: string;
-  strokeWidth: number;
-}
+  width: number;
+};
 
-interface DrawingShape extends BaseShape {
-  tool: "pencil" | "highlighter" | "eraser";
-  points: number[];
-}
+const COLORS = [
+  { name: 'Black', hex: '#000000' },
+  { name: 'Red', hex: '#EF4444' },
+  { name: 'Blue', hex: '#3B82F6' },
+  { name: 'Green', hex: '#22C55E' },
+];
 
-type Shape = DrawingShape ;
+export default function Whiteboard() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [currentTool, setCurrentTool] = useState<'pen' | 'eraser'>('pen');
+  const [currentColor, setCurrentColor] = useState('#000000');
+  
+  const [lines, setLines] = useState<Line[]>([]);
+  const [historyStack, setHistoryStack] = useState<Line[][]>([]);
+  
+  const isDrawing = useRef(false);
+  const currentStroke = useRef<Point[]>([]);
 
-const COLORS = ["#000000", "#EF4444", "#3B82F6", "#10B981", "#F59E0B", "#8B5CF6"];
+  const redrawCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-export default function CanvasPage() {
-  const [tool, setTool] = useState<Tool>("pencil");
-  const [color, setColor] = useState("#000000");
-  const [strokeWidth, setStrokeWidth] = useState(3);
-  const [shapes, setShapes] = useState<Shape[]>([]);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  const [isMounted, setIsMounted] = useState(false);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const stageRef = useRef<Konva.Stage | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    lines.forEach((line) => {
+      ctx.strokeStyle = line.color;
+      ctx.lineWidth = line.width;
+      
+      ctx.beginPath();
+      line.points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.stroke();
+    });
+  };
 
   useEffect(() => {
-    setIsMounted(true);
-    const handleResize = () => {
-      if (containerRef.current) {
-        setDimensions({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight,
-        });
-      }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const setCanvasSize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      redrawCanvas();
     };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
-  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const pos = e.target.getStage()?.getPointerPosition();
-    if (!pos) return;
+    setCanvasSize();
+    window.addEventListener('resize', setCanvasSize);
+    return () => window.removeEventListener('resize', setCanvasSize);
+  }, [lines]);
 
-    setIsDrawing(true);
-    const id = crypto.randomUUID();
-    let newShape: Shape;
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    if (tool === "pencil" || tool === "highlighter" || tool === "eraser") {
-      newShape = { id, tool, color, strokeWidth, points: [pos.x, pos.y] } as DrawingShape;
-    }
+    isDrawing.current = true;
+    currentStroke.current = [];
 
-    setShapes((prev) => [...prev, newShape]);
+    const x = e.nativeEvent.offsetX;
+    const y = e.nativeEvent.offsetY;
+
+    currentStroke.current.push({ x, y });
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : currentColor;
+    ctx.lineWidth = currentTool === 'eraser' ? 20 : 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    setHistoryStack([]);
   };
 
-  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (!isDrawing || shapes.length === 0) return;
-    const pos = e.target.getStage()?.getPointerPosition();
-    if (!pos) return;
+  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    const index = shapes.length - 1;
-    const lastShape = { ...shapes[index] };
+    const x = e.nativeEvent.offsetX;
+    const y = e.nativeEvent.offsetY;
 
-    if (lastShape.tool === "pencil" || lastShape.tool === "highlighter" || lastShape.tool === "eraser") {
-      (lastShape as DrawingShape).points = (lastShape as DrawingShape).points.concat([pos.x, pos.y]);
-    }
+    ctx.lineTo(x, y);
+    ctx.stroke();
 
-    const updatedShapes = [...shapes];
-    updatedShapes[index] = lastShape as Shape;
-    setShapes(updatedShapes);
+    currentStroke.current.push({ x, y });
   };
 
-  if (!isMounted) return null;
+  const stopDrawing = () => {
+    if (!isDrawing.current) return;
+    isDrawing.current = false;
+    
+    if (currentStroke.current.length > 0) {
+      const newLine: Line = {
+        points: [...currentStroke.current],
+        color: currentTool === 'eraser' ? '#ffffff' : currentColor,
+        width: currentTool === 'eraser' ? 20 : 3,
+      };
+
+      setLines((prev) => [...prev, newLine]);
+    }
+  };
+
+
+  const handleUndo = () => {
+    if (lines.length === 0) return;
+    setLines((prev) => {
+      const newLines = [...prev];
+      const removedLine = newLines.pop();
+      if (removedLine) {
+        setHistoryStack((prevStack) => [...prevStack, [removedLine]]);
+      }
+      return newLines;
+    });
+  };
+
+  const handleRedo = () => {
+    if (historyStack.length === 0) return;
+    const lastRedoGroup = historyStack[historyStack.length - 1];
+    
+    setHistoryStack((prev) => prev.slice(0, -1));
+    setLines((prev) => [...prev, ...lastRedoGroup]);
+  };
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-100 overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-3 bg-white border-b shadow-sm z-10">
-        <div className="flex items-center gap-2">
-          <ToolIcon active={tool === "pencil"} onClick={() => setTool("pencil")} icon={<Pencil size={18} />} />
-          <ToolIcon active={tool === "highlighter"} onClick={() => setTool("highlighter")} icon={<Highlighter size={18} />} />
-          <ToolIcon active={tool === "eraser"} onClick={() => setTool("eraser")} icon={<Eraser size={18} />} />
-          <div className="flex gap-2">
+    <div className="relative h-screen w-full overflow-hidden bg-gray-50">
+      
+      <div className="absolute top-4 left-4">
+        <div className="flex items-center rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
+           <button
+             onClick={() => setCurrentTool('pen')}
+             className={`rounded p-2 transition-colors ${currentTool === 'pen' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+           >
+             <Pencil size={20} />
+           </button>
+        </div>
+
+          <div className="flex gap-2 rounded-xl border border-gray-200 bg-white p-3 shadow-sm animate-in fade-in slide-in-from-top-2">
             {COLORS.map((c) => (
-              <button key={c} onClick={() => setColor(c)} className={`w-6 h-6 rounded-full border-2 ${color === c ? "border-blue-500 scale-110" : "border-transparent"}`} style={{ backgroundColor: c }} />
+              <button
+                key={c.name}
+                onClick={() => setCurrentColor(c.hex)}
+                className={`h-6 w-6 rounded-full border border-gray-100 transition-transform hover:scale-110 ${
+                  currentColor === c.hex ? 'ring-2 ring-gray-400 ring-offset-2' : ''
+                }`}
+                style={{ backgroundColor: c.hex }}
+              />
             ))}
           </div>
-        </div>
       </div>
 
-      <div ref={containerRef} className="flex-1 p-8 flex items-center justify-center overflow-hidden">
-        <div className="bg-white shadow-2xl rounded-lg overflow-hidden border border-neutral-200">
-          <Stage
-            ref={stageRef}
-            width={dimensions.width}
-            height={dimensions.height}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={() => setIsDrawing(false)}
-          >
-            <Layer>
-              <Rect width={dimensions.width} height={dimensions.height} fill="white" />
-              {shapes.map((s) => {
-                const common = { key: s.id, stroke: s.color, strokeWidth: s.strokeWidth };
-                if (s.tool === "pencil" || s.tool === "highlighter" || s.tool === "eraser") {
-                  return <Line {...common} points={s.points} tension={0.5} lineCap="round" lineJoin="round" opacity={s.tool === "highlighter" ? 0.4 : 1} globalCompositeOperation={s.tool === "eraser" ? "destination-out" : "source-over"} />;
-                }
-              })}
-            </Layer>
-          </Stage>
-        </div>
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
+        <button onClick={handleUndo} disabled={lines.length === 0} className="rounded-lg p-2 text-gray-700 hover:bg-gray-100 disabled:opacity-30">
+          <Undo2 size={20} />
+        </button>
+        <div className="h-6 w-px bg-gray-200 mx-1"></div>
+        <button onClick={handleRedo} disabled={historyStack.length === 0} className="rounded-lg p-2 text-gray-700 hover:bg-gray-100 disabled:opacity-30">
+          <Redo2 size={20} />
+        </button>
       </div>
+
+      <canvas
+        ref={canvasRef}
+        onMouseDown={startDrawing}
+        onMouseMove={draw}
+        onMouseUp={stopDrawing}
+        onMouseLeave={stopDrawing}
+        className="h-full w-full cursor-crosshair touch-none"
+      />
     </div>
-  );
-}
-
-function ToolIcon({ active, onClick, icon }: { active: boolean; onClick: () => void; icon: React.ReactNode }) {
-  return (
-    <button onClick={onClick} className={`p-2.5 rounded-lg transition-all ${active ? "bg-neutral-100 text-blue-600 shadow-inner" : "text-neutral-500 hover:bg-neutral-50"}`}>
-      {icon}
-    </button>
   );
 }

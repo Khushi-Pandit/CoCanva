@@ -1,10 +1,10 @@
-import CanvasPage from "./canva/page";
+import Whiteboard from "./canva/page";
 
 export default function HomePage() {
   return (
     <main>
       <div>
-        <CanvasPage />
+        <Whiteboard />
       </div>
     </main>
   );

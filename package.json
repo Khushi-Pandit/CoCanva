@@ -12,6 +12,7 @@
     "@prisma/client": "^6.14.0",
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.2.2",
+    "fabric": "^7.1.0",
     "firebase": "^12.8.0",
     "framer-motion": "^12.23.12",
     "jsonwebtoken": "^9.0.2",
