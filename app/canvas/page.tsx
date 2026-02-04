@@ -687,7 +687,7 @@ export default function InfiniteWhiteboard() {
       )}
 
       {/* Keyboard Shortcuts Help */}
-      <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-3 text-xs text-gray-600 max-w-xs">
+      {/* <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-3 text-xs text-gray-600 max-w-xs">
         <div className="font-semibold mb-2">Shortcuts</div>
         <div className="space-y-1">
           <div>P - Pen | E - Eraser | V - Select | H - Pan</div>
@@ -695,7 +695,7 @@ export default function InfiniteWhiteboard() {
           <div>Ctrl+/- - Zoom | Ctrl+0 - Reset</div>
           <div>Ctrl+G - Grid | Ctrl+S - Save</div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }

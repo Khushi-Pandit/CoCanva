@@ -69,7 +69,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   return (
     <div className="absolute top-6 left-6 flex flex-col gap-3 z-10">
       {/* Main Tools */}
-      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl p-2 border border-gray-200">
+      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl p-2 border border-gray-300 w-16">
         <div className="flex flex-col gap-1">
           {/* Draw Tools */}
           <div className="relative">

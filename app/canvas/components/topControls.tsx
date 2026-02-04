@@ -60,13 +60,13 @@ export const TopControls: React.FC<TopControlsProps> = ({
 
   return (
     <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
-      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl p-2 border border-gray-200">
+      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl p-2 border border-gray-300">
         <div className="flex items-center gap-1">
           {/* Undo/Redo */}
           <button
             onClick={onUndo}
             disabled={!canUndo}
-            className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-black"
             title="Undo (Ctrl+Z)"
           >
             <Undo2 size={18} />
@@ -74,13 +74,13 @@ export const TopControls: React.FC<TopControlsProps> = ({
           <button
             onClick={onRedo}
             disabled={!canRedo}
-            className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-black"
             title="Redo (Ctrl+Y)"
           >
             <Redo2 size={18} />
           </button>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-400 mx-1" />
 
           {/* Zoom Controls */}
           <button
@@ -88,7 +88,7 @@ export const TopControls: React.FC<TopControlsProps> = ({
             className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
             title="Zoom Out (Ctrl+-)"
           >
-            <ZoomOut size={18} />
+            <ZoomOut size={18} className='text-gray-700' />
           </button>
           
           <button
@@ -96,7 +96,7 @@ export const TopControls: React.FC<TopControlsProps> = ({
             className="px-3 py-1.5 rounded-xl hover:bg-gray-100 transition-colors min-w-[60px]"
             title="Reset Zoom (Ctrl+0)"
           >
-            <span className="text-sm font-medium">{Math.round(zoom * 100)}%</span>
+            <span className="text-sm font-medium text-gray-700">{Math.round(zoom * 100)}%</span>
           </button>
           
           <button
@@ -104,10 +104,10 @@ export const TopControls: React.FC<TopControlsProps> = ({
             className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
             title="Zoom In (Ctrl++)"
           >
-            <ZoomIn size={18} />
+            <ZoomIn size={18} className='text-gray-700' />
           </button>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-400 mx-1" />
 
           {/* Grid Toggle */}
           <button
@@ -117,7 +117,7 @@ export const TopControls: React.FC<TopControlsProps> = ({
             }`}
             title="Toggle Grid (Ctrl+G)"
           >
-            <Grid3x3 size={18} />
+            <Grid3x3 size={18} className='text-gray-700' />
           </button>
 
           {/* Fit to Screen */}
@@ -126,10 +126,10 @@ export const TopControls: React.FC<TopControlsProps> = ({
             className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
             title="Fit to Screen"
           >
-            <Maximize2 size={18} />
+            <Maximize2 size={18} className='text-gray-700'/>
           </button>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-400 mx-1" />
 
           {/* Export */}
           <div className="relative">
@@ -138,7 +138,7 @@ export const TopControls: React.FC<TopControlsProps> = ({
               className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
               title="Export"
             >
-              <Download size={18} />
+              <Download size={18} className='text-gray-700' />
             </button>
 
             {showExportMenu && (
@@ -172,7 +172,7 @@ export const TopControls: React.FC<TopControlsProps> = ({
             className="p-2.5 rounded-xl hover:bg-blue-100 hover:text-blue-600 transition-colors"
             title="Share"
           >
-            <Share2 size={18} />
+            <Share2 size={18} className='text-gray-700' />
           </button>
 
           {/* Save */}
@@ -181,10 +181,10 @@ export const TopControls: React.FC<TopControlsProps> = ({
             className="p-2.5 rounded-xl hover:bg-green-100 hover:text-green-600 transition-colors"
             title="Save (Ctrl+S)"
           >
-            <Save size={18} />
+            <Save size={18} className='text-gray-700'/>
           </button>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-400 mx-1" />
 
           {/* Clear All */}
           <button
@@ -192,19 +192,19 @@ export const TopControls: React.FC<TopControlsProps> = ({
             className="p-2.5 rounded-xl hover:bg-red-100 hover:text-red-600 transition-colors"
             title="Clear All"
           >
-            <Trash2 size={18} />
+            <Trash2 size={18} className='text-gray-700'/>
           </button>
         </div>
       </div>
 
       {/* Last Saved Indicator */}
-      {lastSaved && (
+      {/* {lastSaved && (
         <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-md border border-gray-200">
           <span className="text-xs text-gray-600">
             Saved {formatTimeAgo(lastSaved)}
           </span>
         </div>
-      )}
+      )} */}
     </div>
   );
 };
