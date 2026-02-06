@@ -1,5 +1,5 @@
-// Core data structures for the whiteboard system
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// Core data structures for the whiteboard system
 
 export type Point = {
   x: number;
@@ -68,6 +68,19 @@ export interface TextElement {
 
 // Union type for all drawable elements
 export type DrawableElement = Stroke | Shape | TextElement;
+
+// Helper type guards
+export const isStroke = (element: DrawableElement): element is Stroke => {
+  return 'points' in element && Array.isArray((element as any).points);
+};
+
+export const isShape = (element: DrawableElement): element is Shape => {
+  return 'type' in element && 'x' in element && 'width' in element && !('points' in element) && !('text' in element);
+};
+
+export const isTextElement = (element: DrawableElement): element is TextElement => {
+  return 'text' in element && typeof (element as any).text === 'string';
+};
 
 // Viewport state for infinite canvas
 export interface Viewport {

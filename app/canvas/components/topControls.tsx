@@ -176,13 +176,13 @@ export const TopControls: React.FC<TopControlsProps> = ({
           </button>
 
           {/* Save */}
-          <button
+          {/* <button
             onClick={onSave}
             className="p-2.5 rounded-xl hover:bg-green-100 hover:text-green-600 transition-colors"
             title="Save (Ctrl+S)"
           >
             <Save size={18} className='text-gray-700'/>
-          </button>
+          </button> */}
 
           <div className="w-px h-6 bg-gray-400 mx-1" />
 

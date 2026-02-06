@@ -89,6 +89,64 @@ export const isPointNearStroke = (
   return false;
 };
 
+// Split a stroke at points where it intersects with eraser
+export const splitStrokeByEraser = (
+  stroke: Stroke,
+  eraserPoints: Point[],
+  eraserWidth: number
+): Stroke[] => {
+  if (stroke.points.length < 2 || eraserPoints.length < 2) {
+    return [stroke];
+  }
+
+  const threshold = eraserWidth / 2 + stroke.width / 2;
+  const newStrokes: Stroke[] = [];
+  let currentSegment: Point[] = [];
+
+  for (let i = 0; i < stroke.points.length; i++) {
+    const point = stroke.points[i];
+    let shouldErase = false;
+
+    // Check if this point is near any eraser segment
+    for (let j = 0; j < eraserPoints.length - 1; j++) {
+      const distance = distanceToSegment(point, eraserPoints[j], eraserPoints[j + 1]);
+      if (distance <= threshold) {
+        shouldErase = true;
+        break;
+      }
+    }
+
+    if (!shouldErase) {
+      currentSegment.push(point);
+    } else {
+      // End current segment if it has points
+      if (currentSegment.length > 1) {
+        newStrokes.push({
+          ...stroke,
+          id: `${stroke.id}_split_${newStrokes.length}`,
+          points: [...currentSegment],
+          bounds: calculateBounds(currentSegment),
+          timestamp: Date.now(),
+        });
+      }
+      currentSegment = [];
+    }
+  }
+
+  // Add final segment if it exists
+  if (currentSegment.length > 1) {
+    newStrokes.push({
+      ...stroke,
+      id: `${stroke.id}_split_${newStrokes.length}`,
+      points: [...currentSegment],
+      bounds: calculateBounds(currentSegment),
+      timestamp: Date.now(),
+    });
+  }
+
+  return newStrokes.length > 0 ? newStrokes : [];
+};
+
 // Simplify stroke using Douglas-Peucker algorithm
 export const simplifyStroke = (points: Point[], tolerance: number = 2): Point[] => {
   if (points.length <= 2) return points;

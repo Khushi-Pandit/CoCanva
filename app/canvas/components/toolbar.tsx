@@ -99,13 +99,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                         onStrokeTypeChange(type);
                         setShowStrokeTypes(false);
                       }}
-                      className={`px-4 py-2 rounded-lg text-left hover:bg-gray-100 transition-colors flex items-center gap-2 whitespace-nowrap ${
+                      className={`px-4 py-2 rounded-lg text-left hover:bg-gray-100 transition-colors flex items-center gap-2 whitespace-nowrap text-color-black ${
                         currentStrokeType === type ? 'bg-blue-50 text-blue-600' : ''
                       }`}
                       title={label}
                     >
                       <span className="text-lg">{icon}</span>
-                      <span className="text-sm font-medium">{label}</span>
+                      <span className="text-sm font-medium text-gray-600">{label}</span>
                     </button>
                   ))}
                 </div>
@@ -132,7 +132,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
             {/* Shapes Submenu */}
             {showShapes && currentTool === 'shape' && (
-              <div className="absolute left-full ml-2 top-0 bg-white rounded-xl shadow-xl p-2 border border-gray-200">
+              <div className="absolute left-full ml-2 top-0 bg-white rounded-xl shadow-xl p-2 border border-gray-200 text-black">
                 <div className="grid grid-cols-2 gap-1">
                   {shapes.map(({ type, Icon, label }) => (
                     <button

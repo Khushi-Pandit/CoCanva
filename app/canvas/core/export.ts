@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import jsPDF from 'jspdf';
 import { CanvasState, ExportFormat, Stroke, Shape, DrawableElement } from './types';
 
@@ -59,11 +60,19 @@ export const exportToSVG = (
         maxX = Math.max(maxX, point.x);
         maxY = Math.max(maxY, point.y);
       });
-    } else if ('x' in element && 'y' in element && 'width' in element && 'height' in element) {
-      minX = Math.min(minX, element.x);
-      minY = Math.min(minY, element.y);
-      maxX = Math.max(maxX, element.x + element.width);
-      maxY = Math.max(maxY, element.y + element.height);
+    } else if ('x' in element && 'y' in element) {
+      if ('width' in element && 'height' in element) {
+        minX = Math.min(minX, element.x);
+        minY = Math.min(minY, element.y);
+        maxX = Math.max(maxX, element.x + element.width);
+        maxY = Math.max(maxY, element.y + element.height);
+      } else {
+        // Text element
+        minX = Math.min(minX, element.x);
+        minY = Math.min(minY, element.y);
+        maxX = Math.max(maxX, element.x + 200); // Approximate text width
+        maxY = Math.max(maxY, element.y + (element as any).fontSize || 24);
+      }
     }
   });
 
@@ -83,7 +92,7 @@ export const exportToSVG = (
         .map((p) => `${p.x - minX + padding},${p.y - minY + padding}`)
         .join(' ');
       svg += `  <polyline points="${points}" stroke="${element.color}" stroke-width="${element.width}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="${element.opacity}"/>\n`;
-    } else if ('type' in element && 'x' in element) {
+    } else if ('type' in element && 'x' in element && 'width' in element) {
       // Shape
       const shape = element as Shape;
       const x = shape.x - minX + padding;
@@ -101,6 +110,15 @@ export const exportToSVG = (
           svg += `  <line x1="${x}" y1="${y}" x2="${x + shape.width}" y2="${y + shape.height}" stroke="${shape.color}" stroke-width="${shape.strokeWidth}" opacity="${shape.opacity}"/>\n`;
           break;
       }
+    } else if ('text' in element && typeof (element as any).text === 'string') {
+      // Text element
+      const textEl = element as any;
+      const x = textEl.x - minX + padding;
+      const y = textEl.y - minY + padding;
+      const lines = textEl.text.split('\n');
+      lines.forEach((line: string, idx: number) => {
+        svg += `  <text x="${x}" y="${y + (idx * textEl.fontSize * 1.2) + textEl.fontSize}" font-family="${textEl.fontFamily}" font-size="${textEl.fontSize}" fill="${textEl.color}">${line}</text>\n`;
+      });
     }
   });
 

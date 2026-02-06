@@ -7,6 +7,7 @@ import {
   Point,
   Stroke,
   Shape,
+  TextElement,
   DrawableElement,
   ToolMode,
   StrokeType,
@@ -14,6 +15,9 @@ import {
   Viewport,
   CanvasState,
   ExportFormat,
+  isStroke,
+  isShape,
+  isTextElement,
 } from './core/types';
 import {
   generateId,
@@ -21,7 +25,9 @@ import {
   isPointNearStroke,
   simplifyStroke,
   screenToCanvas,
+  canvasToScreen,
   throttle,
+  splitStrokeByEraser,
 } from './core/utils';
 import {
   useHistory,
@@ -31,7 +37,7 @@ import {
   useSelection,
 } from './core/hooks';
 import { handleExport } from './core/export';
-import { Share2, X } from 'lucide-react';
+import { Share2, X, Type } from 'lucide-react';
 
 export default function InfiniteWhiteboard() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -49,6 +55,12 @@ export default function InfiniteWhiteboard() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [isEditingText, setIsEditingText] = useState(false);
+  const [textPosition, setTextPosition] = useState<Point | null>(null);
+  const [textInput, setTextInput] = useState('');
+  const [fontSize, setFontSize] = useState(24);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Drawing state
   const currentStroke = useRef<Point[]>([]);
@@ -73,23 +85,63 @@ export default function InfiniteWhiteboard() {
 
   // Canvas drawing functions
   const drawGrid = useCallback((ctx: CanvasRenderingContext2D, vp: Viewport) => {
-    const gridSize = 50;
-    const startX = Math.floor((-vp.x / vp.zoom) / gridSize) * gridSize;
-    const startY = Math.floor((-vp.y / vp.zoom) / gridSize) * gridSize;
-    const endX = startX + (ctx.canvas.width / vp.zoom) + gridSize;
-    const endY = startY + (ctx.canvas.height / vp.zoom) + gridSize;
+    const baseGridSize = 50;
+    const zoom = vp.zoom;
+    
+    // Calculate grid sizes based on zoom
+    let majorGridSize = baseGridSize;
+    let minorGridSize = baseGridSize / 5;
+    
+    // Adjust grid density based on zoom level
+    if (zoom < 0.5) {
+      majorGridSize = baseGridSize * 4;
+      minorGridSize = baseGridSize;
+    } else if (zoom > 2) {
+      majorGridSize = baseGridSize;
+      minorGridSize = baseGridSize / 10;
+    }
+    
+    const startX = Math.floor((-vp.x / vp.zoom) / majorGridSize) * majorGridSize;
+    const startY = Math.floor((-vp.y / vp.zoom) / majorGridSize) * majorGridSize;
+    const endX = startX + (ctx.canvas.width / vp.zoom) + majorGridSize * 2;
+    const endY = startY + (ctx.canvas.height / vp.zoom) + majorGridSize * 2;
 
     ctx.save();
+    
+    // Draw minor grid (thinner lines) - only when zoomed in enough
+    if (zoom >= 0.5) {
+      ctx.strokeStyle = '#f3f4f6';
+      ctx.lineWidth = 0.5 / vp.zoom;
+      ctx.beginPath();
+
+      for (let x = startX; x <= endX; x += minorGridSize) {
+        if (x % majorGridSize !== 0) { // Skip major grid lines
+          ctx.moveTo(x, startY);
+          ctx.lineTo(x, endY);
+        }
+      }
+
+      for (let y = startY; y <= endY; y += minorGridSize) {
+        if (y % majorGridSize !== 0) { // Skip major grid lines
+          ctx.moveTo(startX, y);
+          ctx.lineTo(endX, y);
+        }
+      }
+
+      ctx.stroke();
+    }
+    
+    // Draw major grid (thicker lines)
     ctx.strokeStyle = '#e5e7eb';
     ctx.lineWidth = 1 / vp.zoom;
     ctx.beginPath();
 
-    for (let x = startX; x <= endX; x += gridSize) {
+    for (let x = startX; x <= endX; x += majorGridSize) {
       ctx.moveTo(x, startY);
       ctx.lineTo(x, endY);
     }
 
-    for (let y = startY; y <= endY; y += gridSize) {
+    for (let y = startY; y <= endY; y += majorGridSize) {
       ctx.moveTo(startX, y);
       ctx.lineTo(endX, y);
     }
@@ -102,21 +154,31 @@ export default function InfiniteWhiteboard() {
     if (stroke.points.length === 0) return;
 
     ctx.save();
-    ctx.strokeStyle = stroke.color;
-    ctx.lineWidth = stroke.width;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.globalAlpha = stroke.opacity;
+    
+    // For eraser, use white color to "erase" by painting over
+    if (stroke.type === 'eraser') {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = stroke.width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalAlpha = 1; // Full opacity for eraser
+    } else {
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalAlpha = stroke.opacity;
 
-    // Apply different stroke styles based on type
-    if (stroke.type === 'pencil') {
-      ctx.globalAlpha *= 0.7;
-      ctx.lineWidth *= 0.8;
-    } else if (stroke.type === 'marker') {
-      ctx.globalAlpha *= 0.6;
-      ctx.lineWidth *= 1.5;
-    } else if (stroke.type === 'brush') {
-      ctx.lineWidth *= 1.2;
+      // Apply different stroke styles based on type
+      if (stroke.type === 'pencil') {
+        ctx.globalAlpha *= 0.7;
+        ctx.lineWidth *= 0.8;
+      } else if (stroke.type === 'marker') {
+        ctx.globalAlpha *= 0.6;
+        ctx.lineWidth *= 1.5;
+      } else if (stroke.type === 'brush') {
+        ctx.lineWidth *= 1.2;
+      }
     }
 
     ctx.beginPath();
@@ -197,6 +259,41 @@ export default function InfiniteWhiteboard() {
     ctx.restore();
   }, []);
 
+  const drawText = useCallback((ctx: CanvasRenderingContext2D, textElement: TextElement) => {
+    ctx.save();
+    ctx.fillStyle = textElement.color;
+    ctx.font = `${textElement.fontSize}px ${textElement.fontFamily}`;
+    ctx.globalAlpha = 1;
+    ctx.textBaseline = 'top';
+    
+    // Draw text with word wrapping if needed
+    const lines = textElement.text.split('\n');
+    lines.forEach((line, index) => {
+      ctx.fillText(line, textElement.x, textElement.y + (index * textElement.fontSize * 1.2));
+    });
+    
+    // Draw cursor if this text is being edited
+    if (editingTextId === textElement.id) {
+      const lastLine = lines[lines.length - 1] || '';
+      const textMetrics = ctx.measureText(lastLine);
+      const cursorX = textElement.x + textMetrics.width;
+      const cursorY = textElement.y + ((lines.length - 1) * textElement.fontSize * 1.2);
+      
+      // Blinking cursor effect
+      const blink = Math.floor(Date.now() / 500) % 2;
+      if (blink) {
+        ctx.strokeStyle = textElement.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cursorX, cursorY);
+        ctx.lineTo(cursorX, cursorY + textElement.fontSize);
+        ctx.stroke();
+      }
+    }
+    
+    ctx.restore();
+  }, [editingTextId]);
+
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -220,22 +317,24 @@ export default function InfiniteWhiteboard() {
 
     // Draw all elements
     elements.forEach((element) => {
-      if ('points' in element) {
-        drawStroke(ctx, element as Stroke);
-      } else if ('type' in element && 'x' in element) {
-        drawShape(ctx, element as Shape);
+      if (isStroke(element)) {
+        drawStroke(ctx, element);
+      } else if (isShape(element)) {
+        drawShape(ctx, element);
+      } else if (isTextElement(element)) {
+        drawText(ctx, element);
       }
     });
 
     // Draw current stroke while drawing
-    if (isDrawing && currentStroke.current.length > 0) {
+    if (isDrawing && currentStroke.current.length > 0 && currentTool === 'draw') {
       const tempStroke: Stroke = {
         id: 'temp',
         type: currentStrokeType,
         points: currentStroke.current,
-        color: currentColor,
+        color: currentStrokeType === 'eraser' ? '#ffffff' : currentColor,
         width: strokeWidth,
-        opacity,
+        opacity: 1,
         timestamp: Date.now(),
       };
       drawStroke(ctx, tempStroke);
@@ -306,6 +405,7 @@ export default function InfiniteWhiteboard() {
     drawGrid,
     drawStroke,
     drawShape,
+    drawText,
   ]);
 
   // Resize handler
@@ -337,7 +437,17 @@ export default function InfiniteWhiteboard() {
   // Redraw on changes
   useEffect(() => {
     redrawCanvas();
-  }, [redrawCanvas]);
+  }, [redrawCanvas, elements]);
+
+  // Animate cursor blink when editing text
+  useEffect(() => {
+    if (editingTextId) {
+      const interval = setInterval(() => {
+        redrawCanvas();
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [editingTextId, redrawCanvas]);
 
   // Mouse handlers
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -349,9 +459,85 @@ export default function InfiniteWhiteboard() {
     const screenY = e.clientY - rect.top;
     const canvasPoint = screenToCanvas(screenX, screenY, viewport);
 
+    // If currently editing text and clicking elsewhere, finish editing
+    if (isEditingText && currentTool !== 'text') {
+      setIsEditingText(false);
+      setEditingTextId(null);
+      // Remove empty text elements
+      setElements((prev) => prev.filter((el) => {
+        if (isTextElement(el) && el.text === '') {
+          return false;
+        }
+        return true;
+      }));
+    }
+
     if (currentTool === 'pan' || (e.button === 1) || (e.shiftKey && currentTool === 'draw')) {
       setIsPanning(true);
       panStart.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
+
+    if (currentTool === 'text') {
+      // Check if clicking on existing text to edit
+      let clickedText: TextElement | null = null;
+      for (let i = elements.length - 1; i >= 0; i--) {
+        const element = elements[i];
+        if (isTextElement(element)) {
+          const textWidth = element.text.split('\n').reduce((max, line) => {
+            return Math.max(max, line.length * element.fontSize * 0.6);
+          }, 0);
+          const textHeight = element.text.split('\n').length * element.fontSize * 1.2;
+          
+          if (
+            canvasPoint.x >= element.x &&
+            canvasPoint.x <= element.x + textWidth &&
+            canvasPoint.y >= element.y &&
+            canvasPoint.y <= element.y + textHeight
+          ) {
+            clickedText = element;
+            break;
+          }
+        }
+      }
+
+      if (clickedText) {
+        // Edit existing text
+        setTextInput(clickedText.text);
+        setFontSize(clickedText.fontSize);
+        setTextPosition({ x: clickedText.x, y: clickedText.y });
+        setEditingTextId(clickedText.id);
+        setIsEditingText(true);
+      } else {
+        // Finish previous text if any
+        if (editingTextId) {
+          setElements((prev) => prev.filter((el) => {
+            if (isTextElement(el) && el.text === '') {
+              return false;
+            }
+            return true;
+          }));
+        }
+
+        // Create new text
+        const newTextId = generateId();
+        const newText: TextElement = {
+          id: newTextId,
+          x: canvasPoint.x,
+          y: canvasPoint.y,
+          text: '',
+          fontSize,
+          fontFamily: 'Arial, sans-serif',
+          color: currentColor,
+          timestamp: Date.now(),
+        };
+        
+        setElements((prev) => [...prev, newText]);
+        setTextInput('');
+        setTextPosition(canvasPoint);
+        setEditingTextId(newTextId);
+        setIsEditingText(true);
+      }
       return;
     }
 
@@ -360,7 +546,7 @@ export default function InfiniteWhiteboard() {
       let foundElement = false;
       for (let i = elements.length - 1; i >= 0; i--) {
         const element = elements[i];
-        if ('points' in element && isPointNearStroke(canvasPoint, element as Stroke, 10)) {
+        if (isStroke(element) && isPointNearStroke(canvasPoint, element, 10)) {
           toggleSelect(element.id);
           foundElement = true;
           break;
@@ -383,7 +569,7 @@ export default function InfiniteWhiteboard() {
       setIsDrawing(true);
       currentStroke.current = [canvasPoint];
     }
-  }, [currentTool, viewport, elements, toggleSelect, clearSelection, currentShape]);
+  }, [currentTool, viewport, elements, toggleSelect, clearSelection, currentShape, fontSize, currentColor, isEditingText, editingTextId]);
 
   const handleMouseMove = useCallback(
     throttle((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -468,36 +654,25 @@ export default function InfiniteWhiteboard() {
 
     if (currentTool === 'draw' && currentStroke.current.length > 1) {
       const simplified = simplifyStroke(currentStroke.current, 2);
+
+      // Create stroke (including eraser as white stroke)
       const newStroke: Stroke = {
         id: generateId(),
         type: currentStrokeType,
         points: simplified,
-        color: currentColor,
+        color: currentStrokeType === 'eraser' ? '#ffffff' : currentColor,
         width: strokeWidth,
-        opacity,
+        opacity: 1,
         timestamp: Date.now(),
         bounds: calculateBounds(simplified),
       };
 
-      // Handle eraser
-      if (currentStrokeType === 'eraser') {
-        const remainingElements = elements.filter((element) => {
-          if ('points' in element) {
-            return !newStroke.points.some((point) =>
-              isPointNearStroke(point, element as Stroke, strokeWidth / 2)
-            );
-          }
-          return true;
-        });
-        setElements(remainingElements);
-      } else {
-        setElements((prev) => [...prev, newStroke]);
-        addToHistory({
-          type: 'add',
-          elements: [newStroke],
-          timestamp: Date.now(),
-        });
-      }
+      setElements((prev) => [...prev, newStroke]);
+      addToHistory({
+        type: 'add',
+        elements: [newStroke],
+        timestamp: Date.now(),
+      });
     }
 
     currentStroke.current = [];
@@ -509,7 +684,6 @@ export default function InfiniteWhiteboard() {
     currentColor,
     strokeWidth,
     opacity,
-    elements,
     viewport,
     addToHistory,
     currentShape,
@@ -565,6 +739,61 @@ export default function InfiniteWhiteboard() {
     onSwitchToSelect: () => setCurrentTool('select'),
     onSwitchToPan: () => setCurrentTool('pan'),
   });
+
+  // Handle keyboard input for text editing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isEditingText || !editingTextId) return;
+
+      // Handle Escape to finish editing
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsEditingText(false);
+        setEditingTextId(null);
+        // Remove empty text elements
+        setElements((prev) => prev.filter((el) => {
+          if (isTextElement(el) && el.text === '') {
+            return false;
+          }
+          return true;
+        }));
+        return;
+      }
+
+      // Prevent default for text editing keys
+      if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter' || e.key === 'Delete') {
+        e.preventDefault();
+        
+        setElements((prev) => {
+          const updated = prev.map((el) => {
+            if (el.id === editingTextId && isTextElement(el)) {
+              let newText = el.text;
+
+              if (e.key === 'Backspace') {
+                newText = newText.slice(0, -1);
+              } else if (e.key === 'Delete') {
+                // Delete does nothing at end of text
+              } else if (e.key === 'Enter') {
+                newText += '\n';
+              } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                newText += e.key;
+              }
+
+              return { ...el, text: newText };
+            }
+            return el;
+          });
+          
+          return updated;
+        });
+      }
+    };
+
+    if (isEditingText) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isEditingText, editingTextId]);
 
   const handleClearAll = () => {
     if (window.confirm('Are you sure you want to clear the entire canvas?')) {
@@ -682,6 +911,59 @@ export default function InfiniteWhiteboard() {
             >
               Got it
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Text Editing Instructions Overlay */}
+      {isEditingText && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl border border-gray-200 px-6 py-4 min-w-[500px]">
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <Type size={20} className="text-blue-500" />
+              <button
+                onClick={() => {
+                  setIsEditingText(false);
+                  setEditingTextId(null);
+                  // Remove empty text elements
+                  setElements((prev) => prev.filter((el) => {
+                    if (isTextElement(el) && el.text === '') {
+                      return false;
+                    }
+                    return true;
+                  }));
+                }}
+                className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors font-medium"
+              >
+                Done
+              </button>
+            </div>
+            
+            {/* Font Size Control */}
+            <div className="flex items-center gap-3 pt-2 border-t border-gray-200">
+              <span className="text-xs font-medium text-gray-600 min-w-[70px]">Font Size:</span>
+              <input
+                type="range"
+                min="12"
+                max="72"
+                value={fontSize}
+                onChange={(e) => {
+                  const newSize = Number(e.target.value);
+                  setFontSize(newSize);
+                  // Update current text element's font size
+                  if (editingTextId) {
+                    setElements((prev) => prev.map((el) => {
+                      if (el.id === editingTextId && isTextElement(el)) {
+                        return { ...el, fontSize: newSize };
+                      }
+                      return el;
+                    }));
+                  }
+                }}
+                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+              <span className="text-sm font-mono font-medium text-blue-600 min-w-[45px]">{fontSize}px</span>
+            </div>
           </div>
         </div>
       )}
