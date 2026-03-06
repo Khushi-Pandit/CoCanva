@@ -1,15 +1,10 @@
-import React, { useState } from 'react';
+'use client';
+
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  Undo2,
-  Redo2,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Grid3x3,
-  Download,
-  Share2,
-  Trash2,
-  Save,
+  Undo2, Redo2, ZoomIn, ZoomOut,
+  Grid3x3, Download, Share2, Trash2,
+  ChevronDown, Check,
 } from 'lucide-react';
 import { ExportFormat } from '../core/types';
 
@@ -31,189 +26,219 @@ interface TopControlsProps {
   lastSaved?: Date | null;
 }
 
+const ZOOM_PRESETS = [25, 50, 75, 100, 125, 150, 200];
+
 export const TopControls: React.FC<TopControlsProps> = ({
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo,
-  zoom,
-  onZoomIn,
-  onZoomOut,
-  onResetZoom,
-  showGrid,
-  onToggleGrid,
-  onExport,
-  onShare,
-  onClearAll,
-  onSave,
-  lastSaved,
+  canUndo, canRedo, onUndo, onRedo,
+  zoom, onZoomIn, onZoomOut, onResetZoom,
+  showGrid, onToggleGrid,
+  onExport, onShare, onClearAll, onSave, lastSaved,
 }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showZoomMenu, setShowZoomMenu]     = useState(false);
+  const [copiedShare, setCopiedShare]       = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const zoomRef   = useRef<HTMLDivElement>(null);
 
-  const exportFormats: { format: ExportFormat; label: string; description: string }[] = [
-    { format: 'png', label: 'PNG', description: 'High quality image' },
-    { format: 'jpg', label: 'JPG', description: 'Compressed image' },
-    { format: 'svg', label: 'SVG', description: 'Vector graphics' },
-    { format: 'pdf', label: 'PDF', description: 'Document format' },
-    { format: 'json', label: 'JSON', description: 'Data export' },
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setShowExportMenu(false);
+      if (zoomRef.current   && !zoomRef.current.contains(e.target as Node))   setShowZoomMenu(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const exportFormats: { format: ExportFormat; label: string; ext: string }[] = [
+    { format: 'png',  label: 'PNG Image',       ext: '.png' },
+    { format: 'jpg',  label: 'JPEG Image',       ext: '.jpg' },
+    { format: 'svg',  label: 'SVG Vector',       ext: '.svg' },
+    { format: 'pdf',  label: 'PDF Document',     ext: '.pdf' },
+    { format: 'json', label: 'JSON Data',        ext: '.json' },
   ];
 
+  // Shared button style
+  const iconBtn = (active = false, danger = false) =>
+    `flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-150
+     ${danger  ? 'text-slate-400 hover:bg-red-50 hover:text-red-500'
+     : active  ? 'bg-emerald-50 text-emerald-600'
+     : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`;
+
+  const sep = <div className="w-px h-5 bg-slate-200 mx-0.5" />;
+
   return (
-    <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
-      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl p-2 border border-gray-300">
-        <div className="flex items-center gap-1">
-          {/* Undo/Redo */}
-          <button
-            onClick={onUndo}
-            disabled={!canUndo}
-            className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-black"
-            title="Undo (Ctrl+Z)"
-          >
-            <Undo2 size={18} />
-          </button>
-          <button
-            onClick={onRedo}
-            disabled={!canRedo}
-            className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-black"
-            title="Redo (Ctrl+Y)"
-          >
-            <Redo2 size={18} />
-          </button>
+    <div className="absolute top-5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5">
 
-          <div className="w-px h-6 bg-gray-400 mx-1" />
-
-          {/* Zoom Controls */}
-          <button
-            onClick={onZoomOut}
-            className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
-            title="Zoom Out (Ctrl+-)"
-          >
-            <ZoomOut size={18} className='text-gray-700' />
-          </button>
-          
-          <button
-            onClick={onResetZoom}
-            className="px-3 py-1.5 rounded-xl hover:bg-gray-100 transition-colors min-w-[60px]"
-            title="Reset Zoom (Ctrl+0)"
-          >
-            <span className="text-sm font-medium text-gray-700">{Math.round(zoom * 100)}%</span>
-          </button>
-          
-          <button
-            onClick={onZoomIn}
-            className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
-            title="Zoom In (Ctrl++)"
-          >
-            <ZoomIn size={18} className='text-gray-700' />
-          </button>
-
-          <div className="w-px h-6 bg-gray-400 mx-1" />
-
-          {/* Grid Toggle */}
-          <button
-            onClick={onToggleGrid}
-            className={`p-2.5 rounded-xl transition-all ${
-              showGrid ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'
-            }`}
-            title="Toggle Grid (Ctrl+G)"
-          >
-            <Grid3x3 size={18} className='text-gray-700' />
-          </button>
-
-          {/* Fit to Screen */}
-          <button
-            onClick={onResetZoom}
-            className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
-            title="Fit to Screen"
-          >
-            <Maximize2 size={18} className='text-gray-700'/>
-          </button>
-
-          <div className="w-px h-6 bg-gray-400 mx-1" />
-
-          {/* Export */}
-          <div className="relative">
-            <button
-              onClick={() => setShowExportMenu(!showExportMenu)}
-              className="p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
-              title="Export"
-            >
-              <Download size={18} className='text-gray-700' />
-            </button>
-
-            {showExportMenu && (
-              <div className="absolute top-full mt-2 right-0 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 min-w-[200px]">
-                <div className="px-3 py-2 text-xs font-semibold text-gray-500 border-b border-gray-200">
-                  Export as...
-                </div>
-                {exportFormats.map(({ format, label, description }) => (
-                  <button
-                    key={format}
-                    onClick={() => {
-                      onExport(format);
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors flex items-center justify-between group"
-                  >
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{label}</div>
-                      <div className="text-xs text-gray-500">{description}</div>
-                    </div>
-                    <Download size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Share */}
-          <button
-            onClick={onShare}
-            className="p-2.5 rounded-xl hover:bg-blue-100 hover:text-blue-600 transition-colors"
-            title="Share"
-          >
-            <Share2 size={18} className='text-gray-700' />
-          </button>
-
-          {/* Save */}
-          {/* <button
-            onClick={onSave}
-            className="p-2.5 rounded-xl hover:bg-green-100 hover:text-green-600 transition-colors"
-            title="Save (Ctrl+S)"
-          >
-            <Save size={18} className='text-gray-700'/>
-          </button> */}
-
-          <div className="w-px h-6 bg-gray-400 mx-1" />
-
-          {/* Clear All */}
-          <button
-            onClick={onClearAll}
-            className="p-2.5 rounded-xl hover:bg-red-100 hover:text-red-600 transition-colors"
-            title="Clear All"
-          >
-            <Trash2 size={18} className='text-gray-700'/>
-          </button>
-        </div>
+      {/* ── History ──────────────────────────────────── */}
+      <div
+        className="flex items-center gap-0.5 px-1.5 py-1.5 rounded-xl bg-white/90 backdrop-blur-md
+                   border border-slate-200/80 shadow-md shadow-slate-200/40"
+      >
+        <button
+          onClick={onUndo} disabled={!canUndo}
+          className={`${iconBtn()} disabled:opacity-25 disabled:cursor-not-allowed`}
+          title="Undo (Ctrl+Z)"
+        >
+          <Undo2 size={16} strokeWidth={2} />
+        </button>
+        <button
+          onClick={onRedo} disabled={!canRedo}
+          className={`${iconBtn()} disabled:opacity-25 disabled:cursor-not-allowed`}
+          title="Redo (Ctrl+Y)"
+        >
+          <Redo2 size={16} strokeWidth={2} />
+        </button>
       </div>
 
-      {/* Last Saved Indicator */}
-      {/* {lastSaved && (
-        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-md border border-gray-200">
-          <span className="text-xs text-gray-600">
-            Saved {formatTimeAgo(lastSaved)}
-          </span>
+      {/* ── Zoom ─────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-0.5 px-1.5 py-1.5 rounded-xl bg-white/90 backdrop-blur-md
+                   border border-slate-200/80 shadow-md shadow-slate-200/40"
+      >
+        <button onClick={onZoomOut} className={iconBtn()} title="Zoom out">
+          <ZoomOut size={16} strokeWidth={2} />
+        </button>
+
+        {/* Zoom % with dropdown */}
+        <div className="relative" ref={zoomRef}>
+          <button
+            onClick={() => setShowZoomMenu(v => !v)}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            <span className="text-xs font-semibold text-slate-700 tabular-nums w-8 text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <ChevronDown size={11} className="text-slate-400" />
+          </button>
+
+          {showZoomMenu && (
+            <div
+              className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-white rounded-xl
+                         shadow-2xl border border-slate-100 py-1.5 min-w-[110px] z-50
+                         animate-in slide-in-from-top-1 duration-150"
+            >
+              {ZOOM_PRESETS.map(p => (
+                <button
+                  key={p}
+                  onClick={() => { onResetZoom(); setShowZoomMenu(false); }}
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-xs
+                             text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                >
+                  <span>{p}%</span>
+                  {Math.round(zoom * 100) === p && <Check size={11} className="text-emerald-500" />}
+                </button>
+              ))}
+              <div className="h-px bg-slate-100 my-1" />
+              <button
+                onClick={() => { onResetZoom(); setShowZoomMenu(false); }}
+                className="w-full px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50 text-left transition-colors"
+              >
+                Reset to 100%
+              </button>
+            </div>
+          )}
         </div>
-      )} */}
+
+        <button onClick={onZoomIn} className={iconBtn()} title="Zoom in">
+          <ZoomIn size={16} strokeWidth={2} />
+        </button>
+      </div>
+
+      {/* ── View ─────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-0.5 px-1.5 py-1.5 rounded-xl bg-white/90 backdrop-blur-md
+                   border border-slate-200/80 shadow-md shadow-slate-200/40"
+      >
+        <button
+          onClick={onToggleGrid}
+          className={iconBtn(showGrid)}
+          title="Grid (Ctrl+G)"
+        >
+          <Grid3x3 size={16} strokeWidth={1.8} />
+        </button>
+      </div>
+
+      {/* ── Actions ──────────────────────────────────── */}
+      <div
+        className="flex items-center gap-0.5 px-1.5 py-1.5 rounded-xl bg-white/90 backdrop-blur-md
+                   border border-slate-200/80 shadow-md shadow-slate-200/40"
+      >
+        {/* Export */}
+        <div className="relative" ref={exportRef}>
+          <button
+            onClick={() => setShowExportMenu(v => !v)}
+            className={iconBtn(showExportMenu)}
+            title="Export"
+          >
+            <Download size={16} strokeWidth={2} />
+          </button>
+
+          {showExportMenu && (
+            <div
+              className="absolute top-full mt-2 right-0 bg-white rounded-2xl shadow-2xl
+                         border border-slate-100 py-2 min-w-[180px] z-50
+                         animate-in slide-in-from-top-1 duration-150"
+            >
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest px-4 pb-2">
+                Export as
+              </p>
+              {exportFormats.map(({ format, label, ext }) => (
+                <button
+                  key={format}
+                  onClick={() => { onExport(format); setShowExportMenu(false); }}
+                  className="w-full flex items-center justify-between px-4 py-2 text-sm
+                             text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                >
+                  <span className="font-medium">{label}</span>
+                  <span className="text-xs text-slate-400 font-mono">{ext}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Share */}
+        <button
+          onClick={onShare}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                     bg-emerald-500 text-white hover:bg-emerald-600 active:bg-emerald-700
+                     transition-all shadow-sm shadow-emerald-200 hover:shadow-md hover:shadow-emerald-200"
+          title="Share"
+        >
+          <Share2 size={13} strokeWidth={2.2} />
+          Share
+        </button>
+
+        {sep}
+
+        {/* Clear */}
+        <button
+          onClick={onClearAll}
+          className={iconBtn(false, true)}
+          title="Clear canvas"
+        >
+          <Trash2 size={16} strokeWidth={1.8} />
+        </button>
+      </div>
+
+      {/* Last saved pill — subtle, only when saved */}
+      {lastSaved && (
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/80 backdrop-blur-md
+                     border border-slate-200/60 shadow-sm"
+        >
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          <span className="text-[10px] text-slate-500 font-medium">{formatTimeAgo(lastSaved)}</span>
+        </div>
+      )}
     </div>
   );
 };
 
 function formatTimeAgo(date: Date): string {
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-  
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
+  const s = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (s < 5)    return 'Saved';
+  if (s < 60)   return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  return `${Math.floor(s / 3600)}h ago`;
 }

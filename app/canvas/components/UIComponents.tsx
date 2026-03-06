@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+'use client';
 
-// Remote Cursor Component
+import React, { useEffect, useState } from 'react';
+import { CheckCircle2, AlertCircle, Info, X, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+
+// ─── Remote Cursor ────────────────────────────────────────────────────────────
 interface RemoteCursorProps {
   userId: string;
   userName: string;
@@ -11,42 +13,36 @@ interface RemoteCursorProps {
   color: string;
 }
 
-export const RemoteCursor: React.FC<RemoteCursorProps> = ({
-  userId,
-  userName,
-  x,
-  y,
-  color,
-}) => {
+export const RemoteCursor: React.FC<RemoteCursorProps> = ({ userName, x, y, color }) => {
   return (
     <div
-      className="absolute pointer-events-none z-50 transition-all duration-75"
+      className="absolute pointer-events-none z-50"
       style={{
-        left: `${x}px`,
-        top: `${y}px`,
-        transform: 'translate(-50%, -50%)',
+        left: x,
+        top: y,
+        transform: 'translate(-2px, -2px)',
+        transition: 'left 60ms linear, top 60ms linear',
       }}
     >
-      {/* Cursor */}
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
+      {/* Cursor SVG */}
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
         <path
-          d="M5 3L19 12L12 13L9 20L5 3Z"
+          d="M4 2L16.5 10.5L10.5 11.5L8 17.5L4 2Z"
           fill={color}
           stroke="white"
-          strokeWidth="2"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
         />
       </svg>
-      
-      {/* User Name Label */}
+
+      {/* Name tag */}
       <div
-        className="absolute top-6 left-4 px-2 py-1 rounded-md text-xs font-medium text-white shadow-lg whitespace-nowrap"
-        style={{ backgroundColor: color }}
+        className="absolute top-4 left-3 px-2 py-0.5 rounded-md text-[11px] font-semibold
+                   text-white whitespace-nowrap shadow-lg"
+        style={{
+          backgroundColor: color,
+          letterSpacing: '0.01em',
+        }}
       >
         {userName}
       </div>
@@ -54,206 +50,166 @@ export const RemoteCursor: React.FC<RemoteCursorProps> = ({
   );
 };
 
-// Notification Toast Component
+// ─── Notification Toast ───────────────────────────────────────────────────────
 interface NotificationProps {
   type: 'success' | 'error' | 'info';
   message: string;
   onClose: () => void;
 }
 
-export const Notification: React.FC<NotificationProps> = ({
-  type,
-  message,
-  onClose,
-}) => {
-  const icons = {
-    success: <CheckCircle2 size={20} className="text-green-600" />,
-    error: <AlertCircle size={20} className="text-red-600" />,
-    info: <Info size={20} className="text-blue-600" />,
-  };
+export const Notification: React.FC<NotificationProps> = ({ type, message, onClose }) => {
+  useEffect(() => {
+    const t = setTimeout(onClose, 4000);
+    return () => clearTimeout(t);
+  }, [onClose]);
 
-  const backgrounds = {
-    success: 'bg-green-50 border-green-200',
-    error: 'bg-red-50 border-red-200',
-    info: 'bg-blue-50 border-blue-200',
-  };
+  const config = {
+    success: {
+      icon: <CheckCircle2 size={16} />,
+      classes: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+      iconClass: 'text-emerald-500',
+    },
+    error: {
+      icon: <AlertCircle size={16} />,
+      classes: 'bg-red-50 border-red-200 text-red-800',
+      iconClass: 'text-red-500',
+    },
+    info: {
+      icon: <Info size={16} />,
+      classes: 'bg-sky-50 border-sky-200 text-sky-800',
+      iconClass: 'text-sky-500',
+    },
+  }[type];
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg ${backgrounds[type]} animate-slide-in`}
+      className={`flex items-center gap-2.5 pl-3 pr-2 py-2.5 rounded-xl border text-sm
+                  shadow-lg backdrop-blur-sm font-medium ${config.classes}
+                  animate-in slide-in-from-top-2 duration-200`}
     >
-      {icons[type]}
-      <span className="text-sm font-medium text-gray-800">{message}</span>
+      <span className={config.iconClass}>{config.icon}</span>
+      <span className="flex-1">{message}</span>
       <button
         onClick={onClose}
-        className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+        className="w-5 h-5 flex items-center justify-center rounded-md
+                   opacity-50 hover:opacity-100 transition-opacity"
       >
-        <X size={16} />
+        <X size={13} />
       </button>
     </div>
   );
 };
 
-// Active Users Component
+// ─── Active Users ─────────────────────────────────────────────────────────────
 interface ActiveUsersProps {
   count: number;
   users: Array<{ id: string; name: string; color: string }>;
 }
 
 export const ActiveUsers: React.FC<ActiveUsersProps> = ({ count, users }) => {
-  const displayUsers = users.slice(0, 3);
-  const remaining = count - displayUsers.length;
+  const [showList, setShowList] = useState(false);
+  const shown    = users.slice(0, 4);
+  const overflow = count - shown.length;
 
   return (
-    <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg px-3 py-2 border border-gray-200">
-      <div className="flex -space-x-2">
-        {displayUsers.map((user) => (
-          <div
-            key={user.id}
-            className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-white text-xs font-bold"
-            style={{ backgroundColor: user.color }}
-            title={user.name}
-          >
-            {user.name.charAt(0).toUpperCase()}
-          </div>
-        ))}
-        {remaining > 0 && (
-          <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-400 flex items-center justify-center text-white text-xs font-bold">
-            +{remaining}
-          </div>
-        )}
-      </div>
-      <span className="text-sm font-medium text-gray-700">
-        {count} {count === 1 ? 'user' : 'users'} active
-      </span>
+    <div className="relative">
+      <button
+        onClick={() => setShowList(v => !v)}
+        className="flex items-center gap-2 pl-1 pr-3 py-1.5 rounded-xl
+                   bg-white/90 backdrop-blur-md border border-slate-200/80
+                   shadow-md shadow-slate-200/40 hover:border-emerald-200 transition-all"
+      >
+        {/* Avatar stack */}
+        <div className="flex -space-x-2">
+          {shown.map((user) => (
+            <div
+              key={user.id}
+              className="w-7 h-7 rounded-full border-2 border-white flex items-center
+                         justify-center text-white text-[11px] font-bold shadow-sm"
+              style={{ backgroundColor: user.color }}
+              title={user.name}
+            >
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+          ))}
+          {overflow > 0 && (
+            <div
+              className="w-7 h-7 rounded-full border-2 border-white bg-slate-300
+                         flex items-center justify-center text-white text-[10px] font-bold"
+            >
+              +{overflow}
+            </div>
+          )}
+        </div>
+        <span className="text-xs font-semibold text-slate-600">
+          {count} {count === 1 ? 'person' : 'people'}
+        </span>
+      </button>
+
+      {/* Dropdown list */}
+      {showList && (
+        <div
+          className="absolute top-full mt-2 right-0 bg-white rounded-2xl shadow-2xl
+                     border border-slate-100 py-2 min-w-[170px] z-50
+                     animate-in slide-in-from-top-1 duration-150"
+        >
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest px-3 pb-1.5">
+            Online now
+          </p>
+          {users.map((user) => (
+            <div key={user.id} className="flex items-center gap-2.5 px-3 py-1.5">
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center
+                           text-white text-[10px] font-bold flex-shrink-0"
+                style={{ backgroundColor: user.color }}
+              >
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-sm text-slate-700 font-medium truncate">{user.name}</span>
+              <div className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
-// Loading Spinner
-export const LoadingSpinner: React.FC<{ size?: number }> = ({ size = 24 }) => {
-  return (
-    <div className="flex items-center justify-center">
-      <div
-        className="animate-spin rounded-full border-2 border-gray-300 border-t-blue-500"
-        style={{
-          width: `${size}px`,
-          height: `${size}px`,
-        }}
-      />
-    </div>
-  );
-};
-
-// Connection Status Indicator
+// ─── Connection Status ────────────────────────────────────────────────────────
 interface ConnectionStatusProps {
   isConnected: boolean;
   isSyncing?: boolean;
 }
 
-export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
-  isConnected,
-  isSyncing = false,
-}) => {
-  return (
-    <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg px-3 py-2 border border-gray-200">
-      <div
-        className={`w-2 h-2 rounded-full ${
-          isConnected ? 'bg-green-500' : 'bg-red-500'
-        } ${isSyncing ? 'animate-pulse' : ''}`}
-      />
-      <span className="text-xs font-medium text-gray-700">
-        {isSyncing ? 'Syncing...' : isConnected ? 'Connected' : 'Disconnected'}
-      </span>
-    </div>
-  );
-};
-
-// Mini Map Component (for navigation in large canvases)
-interface MiniMapProps {
-  elements: any[];
-  viewport: { x: number; y: number; zoom: number };
-  width: number;
-  height: number;
-  onNavigate: (x: number, y: number) => void;
-}
-
-export const MiniMap: React.FC<MiniMapProps> = ({
-  elements,
-  viewport,
-  width,
-  height,
-  onNavigate,
-}) => {
-  // Calculate canvas bounds
-  let minX = Infinity,
-    minY = Infinity,
-    maxX = -Infinity,
-    maxY = -Infinity;
-
-  elements.forEach((element) => {
-    if ('points' in element) {
-      element.points.forEach((p: any) => {
-        minX = Math.min(minX, p.x);
-        minY = Math.min(minY, p.y);
-        maxX = Math.max(maxX, p.x);
-        maxY = Math.max(maxY, p.y);
-      });
-    }
-  });
-
-  const scale = Math.min(width / (maxX - minX), height / (maxY - minY)) * 0.8;
+export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ isConnected, isSyncing }) => {
+  if (isConnected && !isSyncing) return null; // hide when all good — clean UI
 
   return (
     <div
-      className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 overflow-hidden cursor-pointer"
-      style={{ width, height }}
-      onClick={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = ((e.clientX - rect.left) / width) * (maxX - minX) + minX;
-        const y = ((e.clientY - rect.top) / height) * (maxY - minY) + minY;
-        onNavigate(x, y);
-      }}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold
+                  border backdrop-blur-md shadow-sm transition-all
+                  ${isSyncing
+                    ? 'bg-sky-50/90 border-sky-200 text-sky-700'
+                    : 'bg-red-50/90 border-red-200 text-red-700'}`}
     >
-      <svg width={width} height={height}>
-        {/* Draw simplified elements */}
-        {elements.map((element, idx) => {
-          if ('points' in element && element.points.length > 0) {
-            const points = element.points
-              .map(
-                (p: any) =>
-                  `${(p.x - minX) * scale},${(p.y - minY) * scale}`
-              )
-              .join(' ');
-            return (
-              <polyline
-                key={idx}
-                points={points}
-                stroke={element.color}
-                strokeWidth="1"
-                fill="none"
-              />
-            );
-          }
-          return null;
-        })}
-
-        {/* Viewport indicator */}
-        <rect
-          x={((-viewport.x / viewport.zoom - minX) * scale)}
-          y={((-viewport.y / viewport.zoom - minY) * scale)}
-          width={width / viewport.zoom * scale}
-          height={height / viewport.zoom * scale}
-          fill="none"
-          stroke="#3b82f6"
-          strokeWidth="2"
-        />
-      </svg>
+      {isSyncing
+        ? <RefreshCw size={12} className="animate-spin" />
+        : <WifiOff size={12} />
+      }
+      {isSyncing ? 'Syncing…' : 'Reconnecting…'}
     </div>
   );
 };
 
-// Context Menu Component
+// ─── Loading Spinner ──────────────────────────────────────────────────────────
+export const LoadingSpinner: React.FC<{ size?: number }> = ({ size = 20 }) => (
+  <div
+    className="animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500"
+    style={{ width: size, height: size }}
+  />
+);
+
+// ─── Context Menu ─────────────────────────────────────────────────────────────
 interface ContextMenuProps {
   x: number;
   y: number;
@@ -262,49 +218,34 @@ interface ContextMenuProps {
     icon?: React.ReactNode;
     onClick: () => void;
     disabled?: boolean;
+    danger?: boolean;
   }>;
   onClose: () => void;
 }
 
-export const ContextMenu: React.FC<ContextMenuProps> = ({
-  x,
-  y,
-  items,
-  onClose,
-}) => {
-  return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40"
-        onClick={onClose}
-      />
-      
-      {/* Menu */}
-      <div
-        className="fixed z-50 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 min-w-[200px] animate-scale-in"
-        style={{
-          left: `${x}px`,
-          top: `${y}px`,
-        }}
-      >
-        {items.map((item, idx) => (
-          <button
-            key={idx}
-            onClick={() => {
-              if (!item.disabled) {
-                item.onClick();
-                onClose();
-              }
-            }}
-            disabled={item.disabled}
-            className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {item.icon && <span className="text-gray-600">{item.icon}</span>}
-            <span className="text-sm font-medium text-gray-900">{item.label}</span>
-          </button>
-        ))}
-      </div>
-    </>
-  );
-};
+export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => (
+  <>
+    <div className="fixed inset-0 z-40" onClick={onClose} />
+    <div
+      className="fixed z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 py-1.5 min-w-[180px]
+                 animate-in zoom-in-95 duration-100"
+      style={{ left: x, top: y }}
+    >
+      {items.map((item, i) => (
+        <button
+          key={i}
+          onClick={() => { if (!item.disabled) { item.onClick(); onClose(); } }}
+          disabled={item.disabled}
+          className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors
+            ${item.danger
+              ? 'text-red-600 hover:bg-red-50'
+              : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-800'}
+            disabled:opacity-40 disabled:cursor-not-allowed`}
+        >
+          {item.icon && <span className="opacity-70">{item.icon}</span>}
+          <span className="font-medium">{item.label}</span>
+        </button>
+      ))}
+    </div>
+  </>
+);

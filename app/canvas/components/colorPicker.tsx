@@ -1,157 +1,141 @@
+'use client';
+
 import React, { useState } from 'react';
-import { Palette, Pipette } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface ColorPickerProps {
   currentColor: string;
-  onColorChange: (color: string)=> void;
+  onColorChange: (color: string) => void;
   onClose?: () => void;
 }
 
-const PRESET_COLORS = [
-  // Primary Colors
-  { name: 'Black', hex: '#000000' },
-  { name: 'White', hex: '#FFFFFF' },
-  { name: 'Gray', hex: '#6B7280' },
-  { name: 'Light Gray', hex: '#D1D5DB' },
-  
-  // Reds
-  { name: 'Red', hex: '#EF4444' },
-  { name: 'Dark Red', hex: '#991B1B' },
-  { name: 'Light Red', hex: '#FCA5A5' },
-  { name: 'Pink', hex: '#EC4899' },
-  
-  // Oranges & Yellows
-  { name: 'Orange', hex: '#F97316' },
-  { name: 'Amber', hex: '#F59E0B' },
-  { name: 'Yellow', hex: '#EAB308' },
-  { name: 'Light Yellow', hex: '#FDE047' },
-  
-  // Greens
-  { name: 'Green', hex: '#22C55E' },
-  { name: 'Dark Green', hex: '#15803D' },
-  { name: 'Lime', hex: '#84CC16' },
-  { name: 'Emerald', hex: '#10B981' },
-  
-  // Blues
-  { name: 'Sky Blue', hex: '#06B6D4' },
-  { name: 'Blue', hex: '#3B82F6' },
-  { name: 'Dark Blue', hex: '#1E40AF' },
-  { name: 'Light Blue', hex: '#93C5FD' },
-  
-  // Purples
-  { name: 'Indigo', hex: '#6366F1' },
-  { name: 'Purple', hex: '#A855F7' },
-  { name: 'Violet', hex: '#8B5CF6' },
-  { name: 'Fuchsia', hex: '#D946EF' },
-  
-  // Browns
-  { name: 'Brown', hex: '#92400E' },
-  { name: 'Tan', hex: '#D97706' },
+// Carefully curated palette — not a rainbow, feels hand-picked
+const PALETTE = [
+  // Neutrals
+  { name: 'Ink',        hex: '#111827' },
+  { name: 'Charcoal',   hex: '#374151' },
+  { name: 'Slate',      hex: '#64748B' },
+  { name: 'Mist',       hex: '#CBD5E1' },
+  { name: 'White',      hex: '#FFFFFF' },
+
+  // Warm
+  { name: 'Crimson',    hex: '#DC2626' },
+  { name: 'Coral',      hex: '#F87171' },
+  { name: 'Tangerine',  hex: '#F97316' },
+  { name: 'Amber',      hex: '#F59E0B' },
+  { name: 'Lemon',      hex: '#FDE047' },
+
+  // Cool
+  { name: 'Emerald',    hex: '#10B981' },
+  { name: 'Mint',       hex: '#6EE7B7' },
+  { name: 'Sky',        hex: '#0EA5E9' },
+  { name: 'Ocean',      hex: '#0284C7' },
+  { name: 'Indigo',     hex: '#4F46E5' },
+
+  // Accent
+  { name: 'Violet',     hex: '#7C3AED' },
+  { name: 'Plum',       hex: '#A855F7' },
+  { name: 'Rose',       hex: '#EC4899' },
+  { name: 'Blush',      hex: '#FB7185' },
+  { name: 'Teal',       hex: '#14B8A6' },
 ];
 
 export const ColorPicker: React.FC<ColorPickerProps> = ({
-  currentColor,
-  onColorChange,
-  onClose,
+  currentColor, onColorChange, onClose,
 }) => {
-  const [customColor, setCustomColor] = useState(currentColor);
+  const [hex, setHex]           = useState(currentColor);
+  const [hexInput, setHexInput] = useState(currentColor);
   const [showCustom, setShowCustom] = useState(false);
 
+  const handleHexInput = (val: string) => {
+    setHexInput(val);
+    if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+      setHex(val);
+      onColorChange(val);
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl shadow-2xl p-4 w-72">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-          <Palette size={16} />
-          Color Palette
-        </h3>
+    <div
+      className="bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 w-64
+                 animate-in zoom-in-95 slide-in-from-left-2 duration-150"
+      style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)' }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Color</span>
         {onClose && (
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="w-6 h-6 flex items-center justify-center rounded-lg
+                       text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
           >
-            ✕
+            <X size={13} />
           </button>
         )}
       </div>
 
-      {/* Preset Colors Grid */}
-      <div className="grid grid-cols-6 gap-2 mb-4">
-        {PRESET_COLORS.map((color) => (
+      {/* Current color preview */}
+      <div
+        className="w-full h-10 rounded-xl mb-3 border border-slate-100 shadow-inner"
+        style={{ background: currentColor }}
+      />
+
+      {/* Swatch grid */}
+      <div className="grid grid-cols-5 gap-2 mb-3">
+        {PALETTE.map(({ hex: c, name }) => (
           <button
-            key={color.hex}
-            onClick={() => onColorChange(color.hex)}
-            className={`h-9 w-9 rounded-lg transition-all hover:scale-110 ${
-              currentColor === color.hex
-                ? 'ring-2 ring-blue-500 ring-offset-2'
-                : 'hover:ring-2 ring-gray-300'
-            }`}
+            key={c}
+            onClick={() => { onColorChange(c); setHexInput(c); setHex(c); }}
+            title={name}
+            className="w-9 h-9 rounded-xl transition-all hover:scale-110 active:scale-95"
             style={{
-              background: color.hex,
-              border: color.hex === '#FFFFFF' ? '1px solid #E5E7EB' : 'none',
+              background: c,
+              boxShadow: currentColor === c
+                ? `0 0 0 2px white, 0 0 0 3.5px #10b981`
+                : '0 1px 3px rgba(0,0,0,0.12)',
+              border: c === '#FFFFFF' ? '1.5px solid #E2E8F0' : 'none',
             }}
-            title={color.name}
           />
         ))}
       </div>
 
-      {/* Custom Color Section */}
-      <div className="border-t border-gray-200 pt-4">
-        <button
-          onClick={() => setShowCustom(!showCustom)}
-          className="w-full flex items-center justify-between text-sm text-gray-700 hover:text-gray-900 mb-3"
-        >
-          <span className="flex items-center gap-2">
-            <Pipette size={14} />
-            Custom Color
-          </span>
-          <span className="text-xs text-gray-400">
-            {showCustom ? '▼' : '▶'}
-          </span>
-        </button>
+      {/* Divider */}
+      <div className="h-px bg-slate-100 mb-3" />
 
-        {showCustom && (
-          <div className="space-y-3">
-            <div className="flex gap-2 items-center">
-              <input
-                type="color"
-                value={customColor}
-                onChange={(e) => {
-                  setCustomColor(e.target.value);
-                  onColorChange(e.target.value);
-                }}
-                className="h-10 w-full rounded-lg cursor-pointer"
-              />
-            </div>
+      {/* Custom color toggle */}
+      <button
+        onClick={() => setShowCustom(v => !v)}
+        className="w-full flex items-center justify-between text-xs font-semibold
+                   text-slate-500 hover:text-slate-700 transition-colors mb-1"
+      >
+        <span>Custom color</span>
+        <span className="text-slate-300 text-base leading-none">{showCustom ? '−' : '+'}</span>
+      </button>
 
+      {showCustom && (
+        <div className="space-y-2 pt-1">
+          <input
+            type="color"
+            value={hex}
+            onChange={e => { setHex(e.target.value); setHexInput(e.target.value); onColorChange(e.target.value); }}
+            className="w-full h-9 rounded-xl cursor-pointer border-0"
+          />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-mono">#</span>
             <input
               type="text"
-              value={customColor}
-              onChange={(e) => {
-                setCustomColor(e.target.value);
-                if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
-                  onColorChange(e.target.value);
-                }
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="#000000"
+              value={hexInput.replace('#', '')}
+              maxLength={6}
+              onChange={e => handleHexInput('#' + e.target.value)}
+              className="flex-1 px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200
+                         text-xs font-mono text-slate-700 focus:outline-none
+                         focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
+              placeholder="10b981"
             />
-          </div>
-        )}
-      </div>
-
-      {/* Current Color Preview */}
-      <div className="border-t border-gray-200 pt-4 mt-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500">Current</span>
-          <div className="flex items-center gap-2">
-            <div
-              className="h-8 w-16 rounded-lg border border-gray-200"
-              style={{ background: currentColor }}
-            />
-            <span className="text-xs font-mono text-gray-600">{currentColor}</span>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
