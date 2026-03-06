@@ -151,38 +151,35 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             onClick={() => {
               onToolChange('shape');
               setShowShapePanel(v => !v);
-              setShowStrokePanel(false);
               setShowBrushPanel(false);
             }}
           >
-            {(() => {
-              const s = shapes.find(s => s.type === currentShape);
-              const Icon = s?.Icon ?? Square;
-              return <Icon size={18} strokeWidth={1.8} />;
-            })()}
+            {(() => { const s = shapes.find(s => s.type === currentShape); const I = s?.Icon ?? Square; return <I size={18} strokeWidth={1.8} />; })()}
             {currentTool === 'shape' && (
               <span className="absolute -right-0.5 -top-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-white" />
             )}
           </button>
 
+          {/* Shape picker panel — 2-col grid, properly spaced */}
           {showShapePanel && currentTool === 'shape' && (
-            <div
-              className="absolute left-full ml-3 top-0 bg-white rounded-2xl shadow-2xl border border-slate-100
-                         p-3 animate-in slide-in-from-left-2 duration-150"
-            >
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2 px-1">Shape</p>
-              <div className="grid grid-cols-3 gap-1">
+            <div className="absolute left-full ml-3 top-0 bg-white rounded-2xl shadow-2xl
+                            border border-slate-100 p-3 z-30 w-[148px]">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
+                Shape
+              </p>
+              {/* 3 per row, 2 rows = all 6 shapes, never overflow */}
+              <div className="grid grid-cols-3 gap-1.5">
                 {shapes.map(({ type, Icon, label }) => (
                   <button
                     key={type}
                     onClick={() => { onShapeChange(type); setShowShapePanel(false); }}
                     title={label}
-                    className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all
                       ${currentShape === type
-                        ? 'bg-emerald-50 text-emerald-600'
-                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+                        ? 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-300'
+                        : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}
                   >
-                    <Icon size={18} strokeWidth={1.6} />
+                    <Icon size={17} strokeWidth={1.6} />
                   </button>
                 ))}
               </div>
@@ -235,7 +232,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {/* Color swatch button */}
         <div className="relative" ref={colorPickerRef}>
           <button
-            onClick={() => setShowColorPicker(v => !v)}
             className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-all group"
             title="Color"
           >
