@@ -21,7 +21,7 @@ import {
 } from './core/types';
 import {
   generateId,
-  calculateBounds,
+  calculateBounds,        
   isPointNearStroke,
   simplifyStroke,
   screenToCanvas,
