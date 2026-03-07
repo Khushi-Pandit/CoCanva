@@ -233,7 +233,7 @@ export default function DashboardPage() {
             <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
               style={{ background:'linear-gradient(135deg,#0d9488,#10b981)' }}>{initials}</div>
             <span className="text-[13px] font-semibold text-slate-700 truncate flex-1 text-left">
-              {(userName.length>10?userName.slice(0,10)+'…':userName)}'s Workspace
+              {(userName.length>10?userName.slice(0,10)+'…':userName)}s Workspace
             </span>
             <ChevronDown size={12} className="text-slate-400 flex-shrink-0"/>
           </button>
