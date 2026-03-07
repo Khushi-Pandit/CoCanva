@@ -1,10 +1,10 @@
 // this page will directlry initialize the main whiteboard component
-import InfiniteWhiteboard from './canvas/page';
+import MainScreen from './Main/page';
 
 export default function HomePage() {
   return (
     <main>
-      <InfiniteWhiteboard />
+      <MainScreen />
     </main>
   );
 }
