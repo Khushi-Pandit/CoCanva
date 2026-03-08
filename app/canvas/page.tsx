@@ -20,8 +20,7 @@ import {
 import { useCollaboration } from './core/useCollaboration';
 import { handleExport } from './core/export';
 import {
-  Share2, X, Type, Copy, Check, Link2,
-  Eye, Pencil, Mic, ChevronDown, LogOut,
+  Type, Eye, ChevronDown, LogOut,
 } from 'lucide-react';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -59,16 +58,13 @@ const serializeElement = (el: DrawableElement) => {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type UserRole = 'owner' | 'editor' | 'viewer' | 'voice';
-interface ShareLinks { viewer?: string; editor?: string; voice?: string; }
 
-// Get initials from name (max 2 chars)
 const getInitials = (name: string) => {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
 };
 
-// Role config
 const ROLE_COLOR: Record<UserRole, string> = {
   owner:  '#10b981',
   editor: '#3b82f6',
@@ -82,7 +78,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
   voice:  'Voice',
 };
 
-// ── User Avatar (top-right) ───────────────────────────────────────────────────
+// ── User Avatar ───────────────────────────────────────────────────────────────
 const UserAvatar: React.FC<{ userName: string; role: UserRole; onSignOut?: () => void }> = ({
   userName, role, onSignOut,
 }) => {
@@ -146,142 +142,22 @@ const UserAvatar: React.FC<{ userName: string; role: UserRole; onSignOut?: () =>
   );
 };
 
-// ── Share Modal ───────────────────────────────────────────────────────────────
-const ShareModal: React.FC<{
-  canvasId: string;
-  firebaseToken: string;
-  onClose: () => void;
-}> = ({ canvasId, firebaseToken, onClose }) => {
-  const [links,   setLinks]   = useState<ShareLinks>({});
-  const [loading, setLoading] = useState(true);
-  const [copied,  setCopied]  = useState<string | null>(null);
-  const [error,   setError]   = useState('');
-
-  useEffect(() => {
-    const generate = async () => {
-      try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/canvas/${canvasId}/share`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${firebaseToken}` },
-            body: JSON.stringify({ roles: ['viewer', 'editor', 'voice'] }),
-          }
-        );
-        const data = await res.json();
-        if (!res.ok) { setError(data.message || 'Failed to generate links'); return; }
-        setLinks(data.links);
-      } catch {
-        setError('Network error. Try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    generate();
-  }, [canvasId, firebaseToken]);
-
-  const copyLink = (role: string, url: string) => {
-    navigator.clipboard.writeText(url);
-    setCopied(role);
-    setTimeout(() => setCopied(null), 2000);
-  };
-
-  const PERMISSIONS = [
-    { role: 'viewer', label: 'View only',     icon: <Eye size={14} />,    color: '#f59e0b', bg: '#fffbeb', border: '#fde68a', desc: 'Can see canvas, cannot draw' },
-    { role: 'editor', label: 'Can edit',      icon: <Pencil size={14} />, color: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe', desc: 'Can draw, erase, add shapes'  },
-    { role: 'voice',  label: 'Voice + edit',  icon: <Mic size={14} />,    color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe', desc: 'Edit + voice chat (soon)'     },
-  ] as const;
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-[420px] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-200"
-        style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.18)' }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
-              <Share2 size={16} className="text-emerald-600" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800">Share Canvas</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Recipients must be logged in to access</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all">
-            <X size={15} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="px-5 py-4 space-y-2.5">
-          {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-
-          {loading ? (
-            <div className="flex items-center justify-center py-10">
-              <div className="w-6 h-6 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
-            </div>
-          ) : (
-            PERMISSIONS.map(({ role, label, icon, color, bg, border, desc }) => {
-              const url = links[role as keyof ShareLinks];
-              const ok  = copied === role;
-              return (
-                <div key={role} className="rounded-xl border p-3" style={{ background: bg, borderColor: border }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-md flex items-center justify-center text-white" style={{ background: color }}>
-                        {icon}
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-slate-700">{label}</p>
-                        <p className="text-[10px] text-slate-400">{desc}</p>
-                      </div>
-                    </div>
-                    {url && (
-                      <button
-                        onClick={() => copyLink(role, url)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-white transition-all"
-                        style={{ background: ok ? '#10b981' : color }}
-                      >
-                        {ok ? <Check size={10} /> : <Copy size={10} />}
-                        {ok ? 'Copied!' : 'Copy'}
-                      </button>
-                    )}
-                  </div>
-                  {url && (
-                    <div className="flex items-center gap-1.5 bg-white/80 rounded-lg px-2 py-1.5">
-                      <Link2 size={10} className="text-slate-300 flex-shrink-0" />
-                      <span className="text-[10px] font-mono text-slate-400 truncate">{url}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        <div className="px-5 pb-5">
-          <button onClick={onClose} className="w-full py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200 transition-colors">
-            Done
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ── Props ─────────────────────────────────────────────────────────────────────
 export interface InfiniteWhiteboardProps {
-  canvasId?: string;
+  canvasId?:      string;
   firebaseToken?: string;
-  userName?: string;
-  userRole?: 'viewer' | 'editor' | 'voice';
+  userName?:      string;
+  userRole?:      'owner' | 'editor' | 'viewer' | 'voice';
+  shareToken?:    string;  // raw share token from sessionStorage — passed to socket for DB role verification
 }
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function InfiniteWhiteboard({
-  canvasId, firebaseToken, userName = 'Anonymous', userRole: initialRole = 'editor',
+  canvasId,
+  firebaseToken,
+  userName = 'Anonymous',
+  userRole: initialRole = 'editor',
+  shareToken = '',
 }: InfiniteWhiteboardProps) {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -296,7 +172,6 @@ export default function InfiniteWhiteboard({
   const [showGrid,          setShowGrid]          = useState(false);
   const [isDrawing,         setIsDrawing]         = useState(false);
   const [isPanning,         setIsPanning]         = useState(false);
-  const [showShareModal,    setShowShareModal]    = useState(false);
   const [isEditingText,     setIsEditingText]     = useState(false);
   const [fontSize,          setFontSize]          = useState(24);
   const [editingTextId,     setEditingTextId]     = useState<string | null>(null);
@@ -308,12 +183,8 @@ export default function InfiniteWhiteboard({
   const panStart      = useRef<Point | null>(null);
 
   const { addToHistory, undo, redo, canUndo, canRedo } = useHistory();
-
-  // ── FIX: Proper zoom with useViewport ─────────────────────────────────────
-  // useViewport returns zoom fn that takes (delta, centerX, centerY)
   const { viewport, zoom: zoomFn, pan, reset: resetViewport } = useViewport();
 
-  // Wrapper: zoom IN by fixed step centered on canvas midpoint
   const zoomIn = useCallback(() => {
     const canvas = canvasRef.current;
     const cx = canvas ? canvas.clientWidth / 2 : window.innerWidth / 2;
@@ -321,7 +192,6 @@ export default function InfiniteWhiteboard({
     zoomFn(0.15, cx, cy);
   }, [zoomFn]);
 
-  // Wrapper: zoom OUT
   const zoomOut = useCallback(() => {
     const canvas = canvasRef.current;
     const cx = canvas ? canvas.clientWidth / 2 : window.innerWidth / 2;
@@ -332,15 +202,24 @@ export default function InfiniteWhiteboard({
   const { selectedIds, toggleSelect, clearSelection } = useSelection();
 
   const canDraw = effectiveRole === 'owner' || effectiveRole === 'editor' || effectiveRole === 'voice';
+  const isOwner = effectiveRole === 'owner';
 
-  // ── Collaboration ───────────────────────────────────────────────────────────
+  // ── Collaboration ─────────────────────────────────────────────────────────
+  // shareToken is passed so useCollaboration can send it in canvas:join
+  // Backend verifies it against DB — we never trust a client-sent role
   const collabOptions = canvasId && firebaseToken ? {
-    canvasId, firebaseToken, userName,
-    onElementAdd:    (el: DrawableElement) => setElements(p => p.find(e => e.id === el.id) ? p : [...p, normalizeElement(el as any)]),
-    onElementDelete: (id: string)          => setElements(p => p.filter(e => e.id !== id)),
-    onElementModify: (el: DrawableElement) => setElements(p => p.map(e => e.id === el.id ? normalizeElement(el as any) : e)),
-    onCanvasClear:   ()                    => setElements([]),
-    onCanvasState:   (raw: any[])          => setElements(raw.map(normalizeElement)),
+    canvasId,
+    firebaseToken,
+    userName,
+    userRole:   effectiveRole,  // required by CollaborationOptions
+    shareToken,                 // backend verifies this against DB to resolve role
+    onElementAdd:      (el: DrawableElement) => setElements(p => p.find(e => e.id === el.id) ? p : [...p, normalizeElement(el as any)]),
+    onElementDelete:   (id: string)          => setElements(p => p.filter(e => e.id !== id)),
+    onElementModify:   (el: DrawableElement) => setElements(p => p.map(e => e.id === el.id ? normalizeElement(el as any) : e)),
+    onCanvasClear:     ()                    => setElements([]),
+    onCanvasState:     (raw: any[])          => setElements(raw.map(normalizeElement)),
+    // Socket confirms the real role from DB — update UI to match
+    onRoleConfirmed:   (role: string)        => setEffectiveRole(role as UserRole),
   } : null;
 
   const {
@@ -349,6 +228,9 @@ export default function InfiniteWhiteboard({
     emitCanvasClear, emitCursorMove, emitStrokeDrawing,
   } = useCollaboration(collabOptions);
 
+  // If backend sends back a confirmed role via canvas:role socket event,
+  // useCollaboration should call onRoleConfirmed — wire it up here
+  // (see useCollaboration patch below)
   useEffect(() => { setEffectiveRole(initialRole as UserRole); }, [initialRole]);
 
   const getCanvasState = useCallback((): CanvasState => ({
@@ -357,7 +239,7 @@ export default function InfiniteWhiteboard({
 
   const { lastSaved, save: triggerSave } = useAutoSave(getCanvasState);
 
-  // ── Rendering ───────────────────────────────────────────────────────────────
+  // ── Rendering ─────────────────────────────────────────────────────────────
   const drawGrid = useCallback((ctx: CanvasRenderingContext2D, vp: Viewport) => {
     const base = 50; const z = vp.zoom;
     let major = base, minor = base / 5;
@@ -494,7 +376,7 @@ export default function InfiniteWhiteboard({
   useEffect(() => { redrawCanvas(); }, [redrawCanvas]);
   useEffect(() => { if (!editingTextId) return; const iv = setInterval(redrawCanvas, 500); return () => clearInterval(iv); }, [editingTextId, redrawCanvas]);
 
-  // ── Mouse handlers ──────────────────────────────────────────────────────────
+  // ── Mouse handlers ────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canDraw && currentTool !== 'pan' && currentTool !== 'select') return;
     const canvas = canvasRef.current; if (!canvas) return;
@@ -567,14 +449,12 @@ export default function InfiniteWhiteboard({
     currentStroke.current = [];
   }, [isDrawing, isPanning, currentTool, currentStrokeType, currentColor, strokeWidth, opacity, viewport, addToHistory, currentShape, canvasId, emitElementAdd]);
 
-  // ── FIX: Wheel zoom — properly centered on cursor ──────────────────────────
   const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const canvas = canvasRef.current; if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const cx = e.clientX - rect.left;
     const cy = e.clientY - rect.top;
-    // Smaller increments for smoother zoom
     const delta = e.deltaY > 0 ? -0.08 : 0.08;
     zoomFn(delta, cx, cy);
   }, [zoomFn]);
@@ -583,8 +463,8 @@ export default function InfiniteWhiteboard({
     onUndo:           () => { const a = undo(); if (a?.type === 'add') setElements(p => p.slice(0, -a.elements.length)); },
     onRedo:           () => { const a = redo(); if (a?.type === 'add') setElements(p => [...p, ...a.elements]); },
     onDelete:         () => { if (selectedIds.size > 0) { selectedIds.forEach(id => { if (canvasId) emitElementDelete(canvasId, id); }); setElements(p => p.filter(e => !selectedIds.has(e.id))); clearSelection(); } },
-    onZoomIn: zoomIn,
-    onZoomOut: zoomOut,
+    onZoomIn:         zoomIn,
+    onZoomOut:        zoomOut,
     onResetZoom:      resetViewport,
     onSave:           triggerSave,
     onToggleGrid:     () => setShowGrid(p => !p),
@@ -620,8 +500,6 @@ export default function InfiniteWhiteboard({
     if (window.confirm('Clear the entire canvas?')) { setElements([]); clearSelection(); if (canvasId) emitCanvasClear(canvasId); }
   };
 
-  const isOwner = effectiveRole === 'owner';
-
   return (
     <div
       ref={containerRef}
@@ -631,7 +509,7 @@ export default function InfiniteWhiteboard({
         cursor: isPanning ? 'grabbing' : currentTool === 'pan' ? 'grab' : currentTool === 'draw' ? 'crosshair' : 'default',
       }}
     >
-      {/* Viewer banner */}
+      {/* View-only banner */}
       {effectiveRole === 'viewer' && (
         <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-center gap-1.5 py-1 bg-amber-50 border-b border-amber-200">
           <Eye size={12} className="text-amber-500" />
@@ -639,7 +517,7 @@ export default function InfiniteWhiteboard({
         </div>
       )}
 
-      {/* Toolbar */}
+      {/* Toolbar — hidden for viewers */}
       {canDraw && (
         <Toolbar
           currentTool={currentTool} currentStrokeType={currentStrokeType}
@@ -651,6 +529,7 @@ export default function InfiniteWhiteboard({
         />
       )}
 
+      {/* TopControls — share button only visible/functional for owner */}
       <TopControls
         canUndo={canUndo} canRedo={canRedo}
         onUndo={() => { const a = undo(); if (a?.type === 'add') setElements(p => p.slice(0, -a.elements.length)); }}
@@ -662,13 +541,15 @@ export default function InfiniteWhiteboard({
         showGrid={showGrid}
         onToggleGrid={() => setShowGrid(p => !p)}
         onExport={f => { const c = canvasRef.current; if (c) handleExport(f, c, elements, viewport, getCanvasState()); }}
-        onShare={isOwner ? () => setShowShareModal(true) : undefined}
         onClearAll={handleClearAll}
         onSave={triggerSave}
         lastSaved={lastSaved}
+        canvasId={canvasId ?? ''}
+        firebaseToken={firebaseToken ?? ''}
+        userRole={effectiveRole}   // TopControls internally hides share for non-owners
       />
 
-      {/* ── Top-right: status + avatar ────────────────────────────────────── */}
+      {/* Top-right: connection status + active users + avatar */}
       <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
         {canvasId && (
           <>
@@ -684,7 +565,7 @@ export default function InfiniteWhiteboard({
         <UserAvatar userName={userName} role={effectiveRole} />
       </div>
 
-      {/* Canvas */}
+      {/* Canvas element */}
       <canvas
         ref={canvasRef}
         onMouseDown={handleMouseDown}
@@ -705,15 +586,6 @@ export default function InfiniteWhiteboard({
           color={cursor.userColor || '#10b981'}
         />
       ))}
-
-      {/* Share modal — only owners can open it */}
-      {showShareModal && canvasId && firebaseToken && (
-        <ShareModal
-          canvasId={canvasId}
-          firebaseToken={firebaseToken}
-          onClose={() => setShowShareModal(false)}
-        />
-      )}
 
       {/* Text editing bar */}
       {isEditingText && (

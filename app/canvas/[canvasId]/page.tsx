@@ -1,89 +1,94 @@
 'use client';
 
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+// FILE: app/canvas/[canvasId]/page.tsx
+//
+// Changes:
+// - Reads sessionStorage share token and sends as x-share-token header to REST API  ✓ (was already done)
+// - Also passes raw shareToken down to InfiniteWhiteboard so it can send it in
+//   the socket canvas:join event — backend verifies it against DB for role resolution.
+
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { auth } from '../../../lib/firebase';
 import InfiniteWhiteboard, { InfiniteWhiteboardProps } from '../../canvas/page';
 
 type AccessState = 'loading' | 'denied' | 'ready';
+type Role = 'owner' | 'editor' | 'viewer' | 'voice';
 
 function CanvasPageInner() {
-  const params       = useParams();
-  const searchParams = useSearchParams();
-  const router       = useRouter();
-
+  const params   = useParams();
+  const router   = useRouter();
   const canvasId = params.canvasId as string;
-  const urlRole  = (searchParams.get('role') as 'viewer' | 'editor' | 'voice') || 'editor';
 
-  const [state,    setState]    = useState<AccessState>('loading');
-  const [token,    setToken]    = useState('');
-  const [userName, setUserName] = useState('');
-  const [errMsg,   setErrMsg]   = useState('');
+  const [state,      setState]      = useState<AccessState>('loading');
+  const [token,      setToken]      = useState('');
+  const [userName,   setUserName]   = useState('');
+  const [userRole,   setUserRole]   = useState<Role>('viewer');
+  const [shareToken, setShareToken] = useState('');   // raw share token for socket
+  const [errMsg,     setErrMsg]     = useState('');
 
   useEffect(() => {
     if (!canvasId) return;
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      // Not logged in
       if (!user) {
-        router.replace(`/login?redirect=/canvas/${canvasId}${urlRole ? '?role=' + urlRole : ''}`);
+        router.replace(`/login?redirect=/canvas/${canvasId}`);
         return;
       }
 
       try {
-        // Force refresh token to make sure it's fresh
         const firebaseToken = await user.getIdToken(true);
 
-        // Verify access with backend
+        // Share token stored by join/[token]/page.tsx after resolving the invite link
+        const storedShareToken = sessionStorage.getItem(`share_token_${canvasId}`) ?? '';
+
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${firebaseToken}`,
+        };
+        if (storedShareToken) {
+          headers['x-share-token'] = storedShareToken;
+        }
+
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/canvas/${canvasId}`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${firebaseToken}`,
-              'Content-Type': 'application/json',
-            },
-          }
+          { headers }
         );
 
-        if (res.status === 401) {
-          router.replace('/login');
-          return;
-        }
-
+        if (res.status === 401) { router.replace('/login'); return; }
         if (res.status === 403) {
           setState('denied');
-          setErrMsg("You don't have access to this canvas.");
+          setErrMsg("You don't have access to this canvas. Ask the owner for an invite link.");
           return;
         }
-
         if (res.status === 404) {
           setState('denied');
-          setErrMsg('Canvas not found or the link has expired.');
+          setErrMsg('Canvas not found.');
           return;
         }
-
         if (!res.ok) {
           setState('denied');
           setErrMsg('Something went wrong. Please try again.');
           return;
         }
 
-        // Access confirmed
+        const data = await res.json();
+        const resolvedRole: Role = data.userRole || 'viewer';
+
         setToken(firebaseToken);
         setUserName(user.displayName || user.email?.split('@')[0] || 'User');
+        setUserRole(resolvedRole);
+        setShareToken(storedShareToken);   // pass to socket join
         setState('ready');
-      } catch (err) {
-        console.error('Canvas access check failed:', err);
+      } catch {
         setState('denied');
         setErrMsg('Network error. Check your connection and try again.');
       }
     });
 
     return () => unsubscribe();
-  }, [canvasId, urlRole, router]);
+  }, [canvasId, router]);
 
-  // Loading
+  // ── Loading ────────────────────────────────────────────────────────────────
   if (state === 'loading') {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-50">
@@ -95,7 +100,7 @@ function CanvasPageInner() {
     );
   }
 
-  // Access denied
+  // ── Denied ─────────────────────────────────────────────────────────────────
   if (state === 'denied') {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-50">
@@ -113,13 +118,13 @@ function CanvasPageInner() {
           <div className="flex gap-2">
             <button
               onClick={() => router.push('/login')}
-              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50"
             >
               Login
             </button>
             <button
               onClick={() => router.push('/dashboard')}
-              className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition-colors"
+              className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600"
             >
               Go Home
             </button>
@@ -129,17 +134,19 @@ function CanvasPageInner() {
     );
   }
 
-  // Ready — render whiteboard
+  // ── Ready — render the whiteboard ──────────────────────────────────────────
+  // NOTE: owner is kept as 'owner' role — InfiniteWhiteboard decides what
+  // owner can/cannot do. We no longer force-cast owner → editor here.
   const wbProps: InfiniteWhiteboardProps = {
     canvasId,
     firebaseToken: token,
     userName,
-    userRole: urlRole,
+    userRole,
+    shareToken,    // socket join needs this to resolve role from DB
   };
   return <InfiniteWhiteboard {...wbProps} />;
 }
 
-// Wrap in Suspense because useSearchParams() requires it in Next.js 13+
 export default function CanvasPage() {
   return (
     <Suspense fallback={

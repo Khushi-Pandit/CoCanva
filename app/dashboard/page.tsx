@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -159,6 +159,7 @@ export default function DashboardPage() {
       if (!u) { router.replace('/login'); return; }
       const t = await u.getIdToken(); setUser(u); setToken(t); load(t);
     }); return () => unsub();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -169,62 +170,92 @@ export default function DashboardPage() {
   const load = async (t: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/canvas`, { headers: { Authorization: `Bearer ${t}` } });
-      const d = await res.json(); setCanvases(Array.isArray(d.canvases) ? d.canvases : []);
-    } catch { setCanvases([]); } setLoading(false);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/canvas`, {
+        headers: { Authorization: `Bearer ${t}` },
+      });
+      const d = await res.json();
+      setCanvases(Array.isArray(d.canvases) ? d.canvases : []);
+    } catch { setCanvases([]); }
+    setLoading(false);
   };
 
   const createCanvas = async () => {
+    if (creating) return;
     setCreating(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/canvas`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ title: 'untitled' }),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: 'Untitled Canvas' }),
       });
-      const d = await res.json(); if (d.canvas?._id) router.push(`/canvas/${d.canvas._id}`);
-      router.push(`/canvas/${d.canvas._id}`);
-    } catch {} setCreating(false);
+      const d = await res.json();
+      // FIX: Only push once — removed duplicate router.push that caused double navigation crash
+      if (d.canvas?._id) {
+        router.push(`/canvas/${d.canvas._id}`);
+      }
+    } catch (err) {
+      console.error('createCanvas error:', err);
+    } finally {
+      setCreating(false);
+    }
   };
 
   const deleteCanvas = async (id: string) => {
     if (!confirm('Delete canvas? Cannot be undone.')) return;
     setCanvases(p => p.filter(c => c._id !== id));
-    await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/canvas/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+    await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/canvas/${id}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {});
   };
 
   const renameCanvas = async (id: string, title: string) => {
     setCanvases(p => p.map(c => c._id === id ? { ...c, title } : c));
     await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/canvas/${id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ title }),
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ title }),
     }).catch(() => {});
   };
 
   const handleSignOut = async () => { await signOut(auth); router.replace('/login'); };
-  const getInitials = (n: string) => { const p = n.trim().split(/\s+/); return p.length>=2 ? (p[0][0]+p[1][0]).toUpperCase() : n.slice(0,2).toUpperCase(); };
+  const getInitials = (n: string) => {
+    const p = n.trim().split(/\s+/);
+    return p.length >= 2 ? (p[0][0]+p[1][0]).toUpperCase() : n.slice(0,2).toUpperCase();
+  };
 
   const userName = user?.displayName || user?.email?.split('@')[0] || 'User';
   const initials = getInitials(userName);
 
   const filtered = canvases.filter(c => (c.title||'untitled').toLowerCase().includes(search.toLowerCase()));
-  const sorted   = [...filtered].sort((a,b) => { const d=new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime(); return sortDesc?d:-d; });
+  const sorted   = [...filtered].sort((a,b) => {
+    const d = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    return sortDesc ? d : -d;
+  });
 
   const groupByDate = (list: Canvas[]) => {
-    const today=new Date(); today.setHours(0,0,0,0);
-    const yesterday=new Date(today); yesterday.setDate(today.getDate()-1);
-    const map: Record<string,Canvas[]> = {};
+    const today     = new Date(); today.setHours(0,0,0,0);
+    const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
+    const map: Record<string, Canvas[]> = {};
     list.forEach(c => {
-      const d=new Date(c.createdAt); d.setHours(0,0,0,0);
-      const label = +d===+today?'Today' : +d===+yesterday?'Yesterday' : d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-      if (!map[label]) map[label]=[]; map[label].push(c);
-    }); return map;
+      const d = new Date(c.createdAt); d.setHours(0,0,0,0);
+      const label = +d===+today ? 'Today' : +d===+yesterday ? 'Yesterday'
+        : d.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+      if (!map[label]) map[label] = [];
+      map[label].push(c);
+    });
+    return map;
   };
 
   const groups = groupByDate(sorted);
-  const NAV = [{ label:'My applets', Icon:Grid2X2 }, { label:'Projects', Icon:FolderOpen }, { label:'Recent', Icon:Clock }, { label:'Trash', Icon:Trash2 }];
+  const NAV = [
+    { label:'My applets', Icon:Grid2X2 },
+    { label:'Projects',   Icon:FolderOpen },
+    { label:'Recent',     Icon:Clock },
+    { label:'Trash',      Icon:Trash2 },
+  ];
 
   return (
     <div className="flex h-screen overflow-hidden font-sans" style={{ background:'#f3f4f6' }}>
-
       {/* Sidebar */}
       <aside className="w-[220px] flex-shrink-0 flex flex-col border-r border-slate-200/80" style={{ background:'#f3f4f6' }}>
         <div ref={menuRef} className="relative px-2.5 pt-3 pb-1">
@@ -233,7 +264,7 @@ export default function DashboardPage() {
             <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
               style={{ background:'linear-gradient(135deg,#0d9488,#10b981)' }}>{initials}</div>
             <span className="text-[13px] font-semibold text-slate-700 truncate flex-1 text-left">
-              {(userName.length>10?userName.slice(0,10)+'…':userName)}s Workspace
+              {(userName.length>10 ? userName.slice(0,10)+'…' : userName)}s Workspace
             </span>
             <ChevronDown size={12} className="text-slate-400 flex-shrink-0"/>
           </button>
@@ -243,7 +274,7 @@ export default function DashboardPage() {
                 <p className="text-xs font-semibold text-slate-700 truncate">{userName}</p>
                 <p className="text-[10px] text-slate-400 truncate">{user?.email}</p>
               </div>
-              <button onClick={handleSignOut} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 transition-colors">
+              <button onClick={handleSignOut} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50">
                 <LogOut size={12}/> Sign out
               </button>
             </div>
@@ -275,13 +306,15 @@ export default function DashboardPage() {
           <button onClick={createCanvas} disabled={creating}
             className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-semibold text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-60"
             style={{ background:'linear-gradient(135deg,#0d9488 0%,#10b981 100%)', boxShadow:'0 2px 10px rgba(16,185,129,0.35)' }}>
-            {creating ? <div className="w-3.5 h-3.5 border-[1.5px] border-white border-t-transparent rounded-full animate-spin"/> : <Plus size={14} strokeWidth={2.5}/>}
+            {creating
+              ? <div className="w-3.5 h-3.5 border-[1.5px] border-white border-t-transparent rounded-full animate-spin"/>
+              : <Plus size={14} strokeWidth={2.5}/>}
             New canvas
           </button>
         </header>
 
         <div className="flex items-center justify-between px-6 py-2.5 border-b border-slate-100/80">
-          <button onClick={() => setSortDesc(v=>!v)} className="flex items-center gap-1.5 text-[12px] font-medium text-slate-500 hover:text-slate-700 transition-colors">
+          <button onClick={() => setSortDesc(v=>!v)} className="flex items-center gap-1.5 text-[12px] font-medium text-slate-500 hover:text-slate-700">
             <ArrowUpDown size={11}/> Date created <span className="text-[10px] opacity-60">{sortDesc ? '↓' : '↑'}</span>
           </button>
           <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
@@ -292,7 +325,9 @@ export default function DashboardPage() {
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {loading ? (
-            <div className="flex items-center justify-center h-40"><div className="w-7 h-7 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>
+            <div className="flex items-center justify-center h-40">
+              <div className="w-7 h-7 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"/>
+            </div>
           ) : sorted.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[55vh] gap-4">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background:'linear-gradient(135deg,#ecfdf5,#d1fae5)' }}>
@@ -304,11 +339,11 @@ export default function DashboardPage() {
               </div>
               <div className="text-center">
                 <p className="text-sm font-semibold text-slate-700 mb-1">{search ? 'No results found' : 'No canvases yet'}</p>
-                <p className="text-xs text-slate-400">{search ? 'Try different keywords' : 'Hit "New canvas" to create your first one'}</p>
+                <p className="text-xs text-slate-400">{search ? 'Try different keywords' : 'Hit "New canvas" to get started'}</p>
               </div>
               {!search && (
                 <button onClick={createCanvas} disabled={creating}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-95 mt-1"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white hover:brightness-110 active:scale-95 mt-1"
                   style={{ background:'linear-gradient(135deg,#0d9488,#10b981)', boxShadow:'0 2px 8px rgba(16,185,129,0.3)' }}>
                   <Plus size={14} strokeWidth={2.5}/> Create canvas
                 </button>

@@ -31,13 +31,6 @@ const PALETTE = [
   { name: 'Sky',        hex: '#0EA5E9' },
   { name: 'Ocean',      hex: '#0284C7' },
   { name: 'Indigo',     hex: '#4F46E5' },
-
-  // Accent
-  { name: 'Violet',     hex: '#7C3AED' },
-  { name: 'Plum',       hex: '#A855F7' },
-  { name: 'Rose',       hex: '#EC4899' },
-  { name: 'Blush',      hex: '#FB7185' },
-  { name: 'Teal',       hex: '#14B8A6' },
 ];
 
 export const ColorPicker: React.FC<ColorPickerProps> = ({
