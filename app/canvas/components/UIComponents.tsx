@@ -2,29 +2,38 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, AlertCircle, Info, X, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Info, X, WifiOff, RefreshCw } from 'lucide-react';
 
-// ─── Remote Cursor ────────────────────────────────────────────────────────────
+// ── Helper ────────────────────────────────────────────────────────────────────
+const getInitials = (name: string) => {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+};
+
+// ─── Remote Cursor — shows initials bubble + name tag ────────────────────────
 interface RemoteCursorProps {
-  userId: string;
+  userId:   string;
   userName: string;
-  x: number;
-  y: number;
-  color: string;
+  x:        number;
+  y:        number;
+  color:    string;
 }
 
 export const RemoteCursor: React.FC<RemoteCursorProps> = ({ userName, x, y, color }) => {
+  const initials = getInitials(userName);
+
   return (
     <div
       className="absolute pointer-events-none z-50"
       style={{
         left: x,
-        top: y,
+        top:  y,
         transform: 'translate(-2px, -2px)',
         transition: 'left 60ms linear, top 60ms linear',
       }}
     >
-      {/* Cursor SVG */}
+      {/* Cursor arrow */}
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
         <path
           d="M4 2L16.5 10.5L10.5 11.5L8 17.5L4 2Z"
@@ -35,16 +44,24 @@ export const RemoteCursor: React.FC<RemoteCursorProps> = ({ userName, x, y, colo
         />
       </svg>
 
-      {/* Name tag */}
-      <div
-        className="absolute top-4 left-3 px-2 py-0.5 rounded-md text-[11px] font-semibold
-                   text-white whitespace-nowrap shadow-lg"
-        style={{
-          backgroundColor: color,
-          letterSpacing: '0.01em',
-        }}
-      >
-        {userName}
+      {/* Initials bubble + name tag — side by side */}
+      <div className="absolute top-4 left-3 flex items-center gap-1">
+        {/* Initials circle */}
+        <div
+          className="w-5 h-5 rounded-full flex items-center justify-center
+                     text-white text-[9px] font-bold border border-white/60 shadow-md flex-shrink-0"
+          style={{ backgroundColor: color }}
+        >
+          {initials}
+        </div>
+        {/* Full name tag */}
+        <div
+          className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold
+                     text-white whitespace-nowrap shadow-lg"
+          style={{ backgroundColor: color }}
+        >
+          {userName}
+        </div>
       </div>
     </div>
   );
@@ -64,36 +81,18 @@ export const Notification: React.FC<NotificationProps> = ({ type, message, onClo
   }, [onClose]);
 
   const config = {
-    success: {
-      icon: <CheckCircle2 size={16} />,
-      classes: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-      iconClass: 'text-emerald-500',
-    },
-    error: {
-      icon: <AlertCircle size={16} />,
-      classes: 'bg-red-50 border-red-200 text-red-800',
-      iconClass: 'text-red-500',
-    },
-    info: {
-      icon: <Info size={16} />,
-      classes: 'bg-sky-50 border-sky-200 text-sky-800',
-      iconClass: 'text-sky-500',
-    },
+    success: { icon: <CheckCircle2 size={16} />, classes: 'bg-emerald-50 border-emerald-200 text-emerald-800', iconClass: 'text-emerald-500' },
+    error:   { icon: <AlertCircle size={16} />,  classes: 'bg-red-50 border-red-200 text-red-800',             iconClass: 'text-red-500'     },
+    info:    { icon: <Info size={16} />,          classes: 'bg-sky-50 border-sky-200 text-sky-800',             iconClass: 'text-sky-500'     },
   }[type];
 
   return (
-    <div
-      className={`flex items-center gap-2.5 pl-3 pr-2 py-2.5 rounded-xl border text-sm
-                  shadow-lg backdrop-blur-sm font-medium ${config.classes}
-                  animate-in slide-in-from-top-2 duration-200`}
-    >
+    <div className={`flex items-center gap-2.5 pl-3 pr-2 py-2.5 rounded-xl border text-sm
+                     shadow-lg backdrop-blur-sm font-medium ${config.classes}
+                     animate-in slide-in-from-top-2 duration-200`}>
       <span className={config.iconClass}>{config.icon}</span>
       <span className="flex-1">{message}</span>
-      <button
-        onClick={onClose}
-        className="w-5 h-5 flex items-center justify-center rounded-md
-                   opacity-50 hover:opacity-100 transition-opacity"
-      >
+      <button onClick={onClose} className="w-5 h-5 flex items-center justify-center rounded-md opacity-50 hover:opacity-100 transition-opacity">
         <X size={13} />
       </button>
     </div>
@@ -119,9 +118,8 @@ export const ActiveUsers: React.FC<ActiveUsersProps> = ({ count, users }) => {
                    bg-white/90 backdrop-blur-md border border-slate-200/80
                    shadow-md shadow-slate-200/40 hover:border-emerald-200 transition-all"
       >
-        {/* Avatar stack */}
         <div className="flex -space-x-2">
-          {shown.map((user) => (
+          {shown.map(user => (
             <div
               key={user.id}
               className="w-7 h-7 rounded-full border-2 border-white flex items-center
@@ -129,14 +127,12 @@ export const ActiveUsers: React.FC<ActiveUsersProps> = ({ count, users }) => {
               style={{ backgroundColor: user.color }}
               title={user.name}
             >
-              {user.name.charAt(0).toUpperCase()}
+              {getInitials(user.name)}
             </div>
           ))}
           {overflow > 0 && (
-            <div
-              className="w-7 h-7 rounded-full border-2 border-white bg-slate-300
-                         flex items-center justify-center text-white text-[10px] font-bold"
-            >
+            <div className="w-7 h-7 rounded-full border-2 border-white bg-slate-300
+                            flex items-center justify-center text-white text-[10px] font-bold">
               +{overflow}
             </div>
           )}
@@ -146,24 +142,21 @@ export const ActiveUsers: React.FC<ActiveUsersProps> = ({ count, users }) => {
         </span>
       </button>
 
-      {/* Dropdown list */}
       {showList && (
-        <div
-          className="absolute top-full mt-2 right-0 bg-white rounded-2xl shadow-2xl
-                     border border-slate-100 py-2 min-w-[170px] z-50
-                     animate-in slide-in-from-top-1 duration-150"
-        >
+        <div className="absolute top-full mt-2 right-0 bg-white rounded-2xl shadow-2xl
+                        border border-slate-100 py-2 min-w-[180px] z-50
+                        animate-in slide-in-from-top-1 duration-150">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest px-3 pb-1.5">
             Online now
           </p>
-          {users.map((user) => (
+          {users.map(user => (
             <div key={user.id} className="flex items-center gap-2.5 px-3 py-1.5">
               <div
                 className="w-6 h-6 rounded-full flex items-center justify-center
                            text-white text-[10px] font-bold flex-shrink-0"
                 style={{ backgroundColor: user.color }}
               >
-                {user.name.charAt(0).toUpperCase()}
+                {getInitials(user.name)}
               </div>
               <span className="text-sm text-slate-700 font-medium truncate">{user.name}</span>
               <div className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -178,24 +171,16 @@ export const ActiveUsers: React.FC<ActiveUsersProps> = ({ count, users }) => {
 // ─── Connection Status ────────────────────────────────────────────────────────
 interface ConnectionStatusProps {
   isConnected: boolean;
-  isSyncing?: boolean;
+  isSyncing?:  boolean;
 }
 
 export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ isConnected, isSyncing }) => {
-  if (isConnected && !isSyncing) return null; // hide when all good — clean UI
-
+  if (isConnected && !isSyncing) return null;
   return (
-    <div
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold
-                  border backdrop-blur-md shadow-sm transition-all
-                  ${isSyncing
-                    ? 'bg-sky-50/90 border-sky-200 text-sky-700'
-                    : 'bg-red-50/90 border-red-200 text-red-700'}`}
-    >
-      {isSyncing
-        ? <RefreshCw size={12} className="animate-spin" />
-        : <WifiOff size={12} />
-      }
+    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold
+                     border backdrop-blur-md shadow-sm transition-all
+                     ${isSyncing ? 'bg-sky-50/90 border-sky-200 text-sky-700' : 'bg-red-50/90 border-red-200 text-red-700'}`}>
+      {isSyncing ? <RefreshCw size={12} className="animate-spin" /> : <WifiOff size={12} />}
       {isSyncing ? 'Syncing…' : 'Reconnecting…'}
     </div>
   );
@@ -214,11 +199,11 @@ interface ContextMenuProps {
   x: number;
   y: number;
   items: Array<{
-    label: string;
-    icon?: React.ReactNode;
-    onClick: () => void;
+    label:     string;
+    icon?:     React.ReactNode;
+    onClick:   () => void;
     disabled?: boolean;
-    danger?: boolean;
+    danger?:   boolean;
   }>;
   onClose: () => void;
 }
@@ -237,9 +222,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }
           onClick={() => { if (!item.disabled) { item.onClick(); onClose(); } }}
           disabled={item.disabled}
           className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors
-            ${item.danger
-              ? 'text-red-600 hover:bg-red-50'
-              : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-800'}
+            ${item.danger ? 'text-red-600 hover:bg-red-50' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-800'}
             disabled:opacity-40 disabled:cursor-not-allowed`}
         >
           {item.icon && <span className="opacity-70">{item.icon}</span>}

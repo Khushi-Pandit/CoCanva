@@ -15,13 +15,11 @@ import {
   screenToCanvas, throttle,
 } from './core/utils';
 import {
-  useHistory, useViewport, useKeyboardShortcuts, useAutoSave, useSelection,
+  useViewport, useKeyboardShortcuts, useAutoSave, useSelection,
 } from './core/hooks';
-import { useCollaboration } from './core/useCollaboration';
+import { useCollaboration, RemoteStroke } from './core/useCollaboration';
 import { handleExport } from './core/export';
-import {
-  Type, Eye, ChevronDown, LogOut,
-} from 'lucide-react';
+import { Type, Eye, ChevronDown, LogOut } from 'lucide-react';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const normalizeElement = (el: any): DrawableElement => {
@@ -50,11 +48,63 @@ const normalizeElement = (el: any): DrawableElement => {
 };
 
 const serializeElement = (el: DrawableElement) => {
-  if (isStroke(el)) return { elementId: el.id, kind: 'stroke', strokeType: el.type, points: el.points, color: el.color, strokeWidth: el.width, opacity: el.opacity, timestamp: el.timestamp };
-  if (isTextElement(el)) return { elementId: el.id, kind: 'text', x: el.x, y: el.y, text: el.text, fontSize: el.fontSize, fontFamily: el.fontFamily, color: el.color, timestamp: el.timestamp };
+  if (isStroke(el)) return {
+    elementId: el.id, kind: 'stroke', strokeType: el.type,
+    points: el.points, color: el.color, strokeWidth: el.width,
+    opacity: el.opacity, timestamp: el.timestamp,
+  };
+  if (isTextElement(el)) return {
+    elementId: el.id, kind: 'text',
+    x: el.x, y: el.y, text: el.text, fontSize: el.fontSize,
+    fontFamily: el.fontFamily, color: el.color, timestamp: el.timestamp,
+  };
   const s = el as Shape;
-  return { elementId: s.id, kind: 'shape', shapeType: s.type, x: s.x, y: s.y, width: s.width, height: s.height, color: s.color, fillColor: s.fillColor, strokeWidth: s.strokeWidth, opacity: s.opacity, rotation: s.rotation, timestamp: s.timestamp };
+  return {
+    elementId: s.id, kind: 'shape', shapeType: s.type,
+    x: s.x, y: s.y, width: s.width, height: s.height,
+    color: s.color, fillColor: s.fillColor, strokeWidth: s.strokeWidth,
+    opacity: s.opacity, rotation: s.rotation, timestamp: s.timestamp,
+  };
 };
+
+// ── Own-only history (undo/redo only affects elements you drew) ───────────────
+// Each entry stores the element id + snapshot before the action
+interface OwnHistoryEntry {
+  type:      'add' | 'delete';
+  elementId: string;
+  snapshot?: DrawableElement; // for delete — to redo the removal
+  element?:  DrawableElement; // for add — to undo the addition
+}
+
+function useOwnHistory() {
+  const stack  = useRef<OwnHistoryEntry[]>([]);
+  const cursor = useRef(-1);
+
+  const push = useCallback((entry: OwnHistoryEntry) => {
+    // Drop any redo future
+    stack.current  = stack.current.slice(0, cursor.current + 1);
+    stack.current.push(entry);
+    cursor.current = stack.current.length - 1;
+  }, []);
+
+  const undo = useCallback(() => {
+    if (cursor.current < 0) return null;
+    const entry = stack.current[cursor.current];
+    cursor.current--;
+    return entry;
+  }, []);
+
+  const redo = useCallback(() => {
+    if (cursor.current >= stack.current.length - 1) return null;
+    cursor.current++;
+    return stack.current[cursor.current];
+  }, []);
+
+  const canUndo = useCallback(() => cursor.current >= 0, []);
+  const canRedo = useCallback(() => cursor.current < stack.current.length - 1, []);
+
+  return { push, undo, redo, canUndo, canRedo };
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type UserRole = 'owner' | 'editor' | 'viewer' | 'voice';
@@ -66,16 +116,10 @@ const getInitials = (name: string) => {
 };
 
 const ROLE_COLOR: Record<UserRole, string> = {
-  owner:  '#10b981',
-  editor: '#3b82f6',
-  viewer: '#f59e0b',
-  voice:  '#8b5cf6',
+  owner:  '#10b981', editor: '#3b82f6', viewer: '#f59e0b', voice: '#8b5cf6',
 };
 const ROLE_LABEL: Record<UserRole, string> = {
-  owner:  'Owner',
-  editor: 'Editor',
-  viewer: 'Viewer',
-  voice:  'Voice',
+  owner: 'Owner', editor: 'Editor', viewer: 'Viewer', voice: 'Voice',
 };
 
 // ── User Avatar ───────────────────────────────────────────────────────────────
@@ -94,11 +138,9 @@ const UserAvatar: React.FC<{ userName: string; role: UserRole; onSignOut?: () =>
                    bg-white/95 backdrop-blur-md border border-slate-200/80
                    shadow-md hover:border-emerald-200 transition-all"
       >
-        <div
-          className="w-7 h-7 rounded-full flex items-center justify-center
-                     text-white text-[11px] font-bold flex-shrink-0"
-          style={{ background: color }}
-        >
+        <div className="w-7 h-7 rounded-full flex items-center justify-center
+                        text-white text-[11px] font-bold flex-shrink-0"
+          style={{ background: color }}>
           {initials}
         </div>
         <div className="flex flex-col items-start leading-none gap-0.5">
@@ -114,10 +156,8 @@ const UserAvatar: React.FC<{ userName: string; role: UserRole; onSignOut?: () =>
           <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl border border-slate-100 py-1.5 w-44 z-50">
             <div className="px-3 py-2 border-b border-slate-100 mb-1">
               <div className="flex items-center gap-2">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                  style={{ background: color }}
-                >
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                  style={{ background: color }}>
                   {initials}
                 </div>
                 <div>
@@ -127,10 +167,8 @@ const UserAvatar: React.FC<{ userName: string; role: UserRole; onSignOut?: () =>
               </div>
             </div>
             {onSignOut && (
-              <button
-                onClick={() => { setOpen(false); onSignOut(); }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition-colors"
-              >
+              <button onClick={() => { setOpen(false); onSignOut(); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition-colors">
                 <LogOut size={13} />
                 <span className="font-medium">Sign out</span>
               </button>
@@ -148,7 +186,7 @@ export interface InfiniteWhiteboardProps {
   firebaseToken?: string;
   userName?:      string;
   userRole?:      'owner' | 'editor' | 'viewer' | 'voice';
-  shareToken?:    string;  // raw share token from sessionStorage — passed to socket for DB role verification
+  shareToken?:    string;
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -175,51 +213,60 @@ export default function InfiniteWhiteboard({
   const [isEditingText,     setIsEditingText]     = useState(false);
   const [fontSize,          setFontSize]          = useState(24);
   const [editingTextId,     setEditingTextId]     = useState<string | null>(null);
-  const [remoteStrokes,     setRemoteStrokes]     = useState<Record<string, any>>({});
   const [effectiveRole,     setEffectiveRole]     = useState<UserRole>(initialRole as UserRole);
+
+  // Remote live strokes: socketId → RemoteStroke
+  const [remoteStrokes, setRemoteStrokes] = useState<Record<string, RemoteStroke>>({});
 
   const currentStroke = useRef<Point[]>([]);
   const shapeStart    = useRef<Point | null>(null);
   const panStart      = useRef<Point | null>(null);
 
-  const { addToHistory, undo, redo, canUndo, canRedo } = useHistory();
+  // Own-only undo/redo — tracks only this user's element adds/deletes
+  const history  = useOwnHistory();
+  const [historyVersion, setHistoryVersion] = useState(0); // triggers canUndo/canRedo re-eval
+  const canUndo  = history.canUndo();
+  const canRedo  = history.canRedo();
+
   const { viewport, zoom: zoomFn, pan, reset: resetViewport } = useViewport();
 
   const zoomIn = useCallback(() => {
-    const canvas = canvasRef.current;
-    const cx = canvas ? canvas.clientWidth / 2 : window.innerWidth / 2;
-    const cy = canvas ? canvas.clientHeight / 2 : window.innerHeight / 2;
-    zoomFn(0.15, cx, cy);
+    const c = canvasRef.current;
+    zoomFn(0.15, c ? c.clientWidth / 2 : window.innerWidth / 2, c ? c.clientHeight / 2 : window.innerHeight / 2);
   }, [zoomFn]);
 
   const zoomOut = useCallback(() => {
-    const canvas = canvasRef.current;
-    const cx = canvas ? canvas.clientWidth / 2 : window.innerWidth / 2;
-    const cy = canvas ? canvas.clientHeight / 2 : window.innerHeight / 2;
-    zoomFn(-0.15, cx, cy);
+    const c = canvasRef.current;
+    zoomFn(-0.15, c ? c.clientWidth / 2 : window.innerWidth / 2, c ? c.clientHeight / 2 : window.innerHeight / 2);
   }, [zoomFn]);
 
   const { selectedIds, toggleSelect, clearSelection } = useSelection();
 
   const canDraw = effectiveRole === 'owner' || effectiveRole === 'editor' || effectiveRole === 'voice';
-  const isOwner = effectiveRole === 'owner';
 
   // ── Collaboration ─────────────────────────────────────────────────────────
-  // shareToken is passed so useCollaboration can send it in canvas:join
-  // Backend verifies it against DB — we never trust a client-sent role
   const collabOptions = canvasId && firebaseToken ? {
-    canvasId,
-    firebaseToken,
-    userName,
-    userRole:   effectiveRole,  // required by CollaborationOptions
-    shareToken,                 // backend verifies this against DB to resolve role
-    onElementAdd:      (el: DrawableElement) => setElements(p => p.find(e => e.id === el.id) ? p : [...p, normalizeElement(el as any)]),
-    onElementDelete:   (id: string)          => setElements(p => p.filter(e => e.id !== id)),
-    onElementModify:   (el: DrawableElement) => setElements(p => p.map(e => e.id === el.id ? normalizeElement(el as any) : e)),
-    onCanvasClear:     ()                    => setElements([]),
-    onCanvasState:     (raw: any[])          => setElements(raw.map(normalizeElement)),
-    // Socket confirms the real role from DB — update UI to match
-    onRoleConfirmed:   (role: string)        => setEffectiveRole(role as UserRole),
+    canvasId, firebaseToken, userName,
+    userRole:   effectiveRole,
+    shareToken,
+    onElementAdd:    (el: DrawableElement) =>
+      setElements(p => p.find(e => e.id === el.id) ? p : [...p, normalizeElement(el as any)]),
+    onElementDelete: (id: string) =>
+      setElements(p => p.filter(e => e.id !== id)),
+    onElementModify: (el: DrawableElement) =>
+      setElements(p => p.map(e => e.id === el.id ? normalizeElement(el as any) : e)),
+    onCanvasClear:   () => setElements([]),
+    onCanvasState:   (raw: any[]) => setElements(raw.map(normalizeElement)),
+    onRoleConfirmed: (role: string) => setEffectiveRole(role as UserRole),
+    // Live stroke preview from remote users
+    onRemoteStrokeUpdate: (socketId: string, stroke: RemoteStroke | null) => {
+      setRemoteStrokes(prev => {
+        const next = { ...prev };
+        if (stroke === null) delete next[socketId];
+        else next[socketId] = stroke;
+        return next;
+      });
+    },
   } : null;
 
   const {
@@ -228,16 +275,44 @@ export default function InfiniteWhiteboard({
     emitCanvasClear, emitCursorMove, emitStrokeDrawing,
   } = useCollaboration(collabOptions);
 
-  // If backend sends back a confirmed role via canvas:role socket event,
-  // useCollaboration should call onRoleConfirmed — wire it up here
-  // (see useCollaboration patch below)
   useEffect(() => { setEffectiveRole(initialRole as UserRole); }, [initialRole]);
 
   const getCanvasState = useCallback((): CanvasState => ({
     version: '1.0.0', elements, viewport, createdAt: Date.now(), updatedAt: Date.now(),
   }), [elements, viewport]);
 
-  const { lastSaved, save: triggerSave } = useAutoSave(getCanvasState);
+  const { lastSaved, save: triggerSave } = useAutoSave(getCanvasState, 30000, canvasId, firebaseToken);
+
+  // ── Undo / Redo handlers (own elements only) ──────────────────────────────
+  const handleUndo = useCallback(() => {
+    const entry = history.undo();
+    if (!entry) return;
+    if (entry.type === 'add' && entry.element) {
+      // Undo an add → remove the element locally + tell others
+      setElements(p => p.filter(e => e.id !== entry.elementId));
+      if (canvasId) emitElementDelete(canvasId, entry.elementId);
+    } else if (entry.type === 'delete' && entry.snapshot) {
+      // Undo a delete → re-add the element
+      setElements(p => [...p, entry.snapshot!]);
+      if (canvasId) emitElementAdd(canvasId, serializeElement(entry.snapshot!) as any);
+    }
+    setHistoryVersion(v => v + 1);
+  }, [history, canvasId, emitElementDelete, emitElementAdd]);
+
+  const handleRedo = useCallback(() => {
+    const entry = history.redo();
+    if (!entry) return;
+    if (entry.type === 'add' && entry.element) {
+      // Redo an add → re-add the element
+      setElements(p => p.find(e => e.id === entry.elementId) ? p : [...p, entry.element!]);
+      if (canvasId) emitElementAdd(canvasId, serializeElement(entry.element!) as any);
+    } else if (entry.type === 'delete' && entry.snapshot) {
+      // Redo a delete → remove again
+      setElements(p => p.filter(e => e.id !== entry.elementId));
+      if (canvasId) emitElementDelete(canvasId, entry.elementId);
+    }
+    setHistoryVersion(v => v + 1);
+  }, [history, canvasId, emitElementAdd, emitElementDelete]);
 
   // ── Rendering ─────────────────────────────────────────────────────────────
   const drawGrid = useCallback((ctx: CanvasRenderingContext2D, vp: Viewport) => {
@@ -300,11 +375,11 @@ export default function InfiniteWhiteboard({
     el.text.split('\n').forEach((line, i) => ctx.fillText(line, el.x, el.y + i * el.fontSize * 1.2));
     if (editingTextId === el.id) {
       const lines = el.text.split('\n'); const last = lines[lines.length - 1] || '';
-      const m = ctx.measureText(last); const cx = el.x + m.width;
-      const cy = el.y + (lines.length - 1) * el.fontSize * 1.2;
+      const m = ctx.measureText(last); const cx2 = el.x + m.width;
+      const cy2 = el.y + (lines.length - 1) * el.fontSize * 1.2;
       if (Math.floor(Date.now() / 500) % 2) {
         ctx.strokeStyle = el.color; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy + el.fontSize); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx2, cy2); ctx.lineTo(cx2, cy2 + el.fontSize); ctx.stroke();
       }
     }
     ctx.restore();
@@ -320,26 +395,46 @@ export default function InfiniteWhiteboard({
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(-viewport.x / viewport.zoom, -viewport.y / viewport.zoom, canvas.width / viewport.zoom, canvas.height / viewport.zoom);
     if (showGrid) drawGrid(ctx, viewport);
+
+    // Committed elements
     elements.forEach(el => {
       if (isStroke(el)) drawStroke(ctx, el);
       else if (isShape(el)) drawShape(ctx, el);
       else if (isTextElement(el)) drawText(ctx, el);
     });
-    Object.values(remoteStrokes).forEach(({ points, color, width }: any) => {
-      if (points.length < 2) return;
-      ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width;
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha = 0.65;
-      ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
-      points.forEach((p: Point) => ctx.lineTo(p.x, p.y)); ctx.stroke(); ctx.restore();
+
+    // Remote live stroke previews (what other users are currently drawing)
+    Object.values(remoteStrokes).forEach(rs => {
+      if (rs.points.length < 2) return;
+      ctx.save();
+      ctx.strokeStyle = rs.color; ctx.lineWidth = rs.width;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha = 0.7;
+      ctx.beginPath(); ctx.moveTo(rs.points[0].x, rs.points[0].y);
+      rs.points.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
+      ctx.restore();
     });
+
+    // Local in-progress stroke
     if (isDrawing && currentStroke.current.length > 0 && currentTool === 'draw') {
-      drawStroke(ctx, { id: 'temp', type: currentStrokeType, points: currentStroke.current, color: currentStrokeType === 'eraser' ? '#f8fafc' : currentColor, width: strokeWidth, opacity: 1, timestamp: Date.now() });
+      drawStroke(ctx, {
+        id: 'temp', type: currentStrokeType,
+        points: currentStroke.current,
+        color: currentStrokeType === 'eraser' ? '#f8fafc' : currentColor,
+        width: strokeWidth, opacity: 1, timestamp: Date.now(),
+      });
     }
     if (isDrawing && shapeStart.current && currentTool === 'shape') {
       const last = currentStroke.current[currentStroke.current.length - 1];
       const cur  = screenToCanvas(last?.x || 0, last?.y || 0, viewport);
-      drawShape(ctx, { id: 'temp', type: currentShape, x: Math.min(shapeStart.current.x, cur.x), y: Math.min(shapeStart.current.y, cur.y), width: Math.abs(cur.x - shapeStart.current.x), height: Math.abs(cur.y - shapeStart.current.y), color: currentColor, strokeWidth, opacity, rotation: 0, timestamp: Date.now() });
+      drawShape(ctx, {
+        id: 'temp', type: currentShape,
+        x: Math.min(shapeStart.current.x, cur.x), y: Math.min(shapeStart.current.y, cur.y),
+        width: Math.abs(cur.x - shapeStart.current.x), height: Math.abs(cur.y - shapeStart.current.y),
+        color: currentColor, strokeWidth, opacity, rotation: 0, timestamp: Date.now(),
+      });
     }
+
+    // Selection highlight
     if (selectedIds.size > 0) {
       ctx.strokeStyle = '#10b981'; ctx.lineWidth = 1.5 / viewport.zoom;
       ctx.setLineDash([4 / viewport.zoom, 4 / viewport.zoom]);
@@ -352,9 +447,10 @@ export default function InfiniteWhiteboard({
       ctx.setLineDash([]);
     }
     ctx.restore();
-  }, [elements, viewport, showGrid, isDrawing, currentStrokeType, currentColor, strokeWidth, opacity, selectedIds, currentTool, currentShape, remoteStrokes, drawGrid, drawStroke, drawShape, drawText]);
+  }, [elements, viewport, showGrid, isDrawing, currentStrokeType, currentColor, strokeWidth, opacity,
+      selectedIds, currentTool, currentShape, remoteStrokes, drawGrid, drawStroke, drawShape, drawText]);
 
-  // Resize observer
+  // Resize
   useEffect(() => {
     const canvas = canvasRef.current; const container = containerRef.current;
     if (!canvas || !container) return;
@@ -374,7 +470,11 @@ export default function InfiniteWhiteboard({
   }, [redrawCanvas]);
 
   useEffect(() => { redrawCanvas(); }, [redrawCanvas]);
-  useEffect(() => { if (!editingTextId) return; const iv = setInterval(redrawCanvas, 500); return () => clearInterval(iv); }, [editingTextId, redrawCanvas]);
+  useEffect(() => {
+    if (!editingTextId) return;
+    const iv = setInterval(redrawCanvas, 500);
+    return () => clearInterval(iv);
+  }, [editingTextId, redrawCanvas]);
 
   // ── Mouse handlers ────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -383,8 +483,13 @@ export default function InfiniteWhiteboard({
     const rect = canvas.getBoundingClientRect();
     const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
     const cp = screenToCanvas(sx, sy, viewport);
-    if (isEditingText && currentTool !== 'text') { setIsEditingText(false); setEditingTextId(null); setElements(p => p.filter(el => !(isTextElement(el) && el.text === ''))); }
-    if (currentTool === 'pan' || e.button === 1 || (e.shiftKey && currentTool === 'draw')) { setIsPanning(true); panStart.current = { x: e.clientX, y: e.clientY }; return; }
+    if (isEditingText && currentTool !== 'text') {
+      setIsEditingText(false); setEditingTextId(null);
+      setElements(p => p.filter(el => !(isTextElement(el) && el.text === '')));
+    }
+    if (currentTool === 'pan' || e.button === 1 || (e.shiftKey && currentTool === 'draw')) {
+      setIsPanning(true); panStart.current = { x: e.clientX, y: e.clientY }; return;
+    }
     if (currentTool === 'text' && canDraw) {
       let clicked: TextElement | null = null;
       for (let i = elements.length - 1; i >= 0; i--) {
@@ -399,14 +504,18 @@ export default function InfiniteWhiteboard({
       else {
         if (editingTextId) setElements(p => p.filter(el => !(isTextElement(el) && el.text === '')));
         const id = generateId();
-        setElements(p => [...p, { id, x: cp.x, y: cp.y, text: '', fontSize, fontFamily: 'Georgia, serif', color: currentColor, timestamp: Date.now() } as TextElement]);
+        const newEl: TextElement = { id, x: cp.x, y: cp.y, text: '', fontSize, fontFamily: 'Georgia, serif', color: currentColor, timestamp: Date.now() };
+        setElements(p => [...p, newEl]);
         setEditingTextId(id); setIsEditingText(true);
       }
       return;
     }
     if (currentTool === 'select') {
       let found = false;
-      for (let i = elements.length - 1; i >= 0; i--) { const el = elements[i]; if (isStroke(el) && isPointNearStroke(cp, el, 10)) { toggleSelect(el.id); found = true; break; } }
+      for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        if (isStroke(el) && isPointNearStroke(cp, el, 10)) { toggleSelect(el.id); found = true; break; }
+      }
       if (!found) clearSelection();
       return;
     }
@@ -420,11 +529,18 @@ export default function InfiniteWhiteboard({
       const rect = canvas.getBoundingClientRect();
       const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
       if (canvasId) emitCursorMove(canvasId, sx, sy);
-      if (isPanning && panStart.current) { pan(e.clientX - panStart.current.x, e.clientY - panStart.current.y); panStart.current = { x: e.clientX, y: e.clientY }; return; }
+      if (isPanning && panStart.current) {
+        pan(e.clientX - panStart.current.x, e.clientY - panStart.current.y);
+        panStart.current = { x: e.clientX, y: e.clientY }; return;
+      }
       if (!isDrawing) return;
       const cp = screenToCanvas(sx, sy, viewport);
       if (currentTool === 'shape') { currentStroke.current = [currentStroke.current[0], { x: sx, y: sy }]; redrawCanvas(); return; }
-      if (currentTool === 'draw')  { currentStroke.current.push(cp); if (canvasId) emitStrokeDrawing(canvasId, currentStroke.current, currentColor, strokeWidth, currentStrokeType); redrawCanvas(); }
+      if (currentTool === 'draw') {
+        currentStroke.current.push(cp);
+        if (canvasId) emitStrokeDrawing(canvasId, currentStroke.current, currentColor, strokeWidth, currentStrokeType);
+        redrawCanvas();
+      }
     }, 16),
     [isDrawing, isPanning, currentTool, viewport, pan, redrawCanvas, canvasId, emitCursorMove, emitStrokeDrawing, currentColor, strokeWidth, currentStrokeType]
   );
@@ -433,36 +549,58 @@ export default function InfiniteWhiteboard({
     if (isPanning) { setIsPanning(false); panStart.current = null; return; }
     if (!isDrawing) return;
     setIsDrawing(false);
+
     if (currentTool === 'shape' && shapeStart.current && currentStroke.current.length >= 2) {
       const end = screenToCanvas(currentStroke.current[1].x, currentStroke.current[1].y, viewport);
-      const s: Shape = { id: generateId(), type: currentShape, x: Math.min(shapeStart.current.x, end.x), y: Math.min(shapeStart.current.y, end.y), width: Math.abs(end.x - shapeStart.current.x), height: Math.abs(end.y - shapeStart.current.y), color: currentColor, strokeWidth, opacity, rotation: 0, timestamp: Date.now() };
-      setElements(p => [...p, s]); addToHistory({ type: 'add', elements: [s], timestamp: Date.now() });
+      const s: Shape = {
+        id: generateId(), type: currentShape,
+        x: Math.min(shapeStart.current.x, end.x), y: Math.min(shapeStart.current.y, end.y),
+        width: Math.abs(end.x - shapeStart.current.x), height: Math.abs(end.y - shapeStart.current.y),
+        color: currentColor, strokeWidth, opacity, rotation: 0, timestamp: Date.now(),
+      };
+      setElements(p => [...p, s]);
+      history.push({ type: 'add', elementId: s.id, element: s });
+      setHistoryVersion(v => v + 1);
       if (canvasId) emitElementAdd(canvasId, serializeElement(s) as any);
       shapeStart.current = null; currentStroke.current = []; return;
     }
+
     if (currentTool === 'draw' && currentStroke.current.length > 1) {
       const pts = simplifyStroke(currentStroke.current, 2);
-      const s: Stroke = { id: generateId(), type: currentStrokeType, points: pts, color: currentStrokeType === 'eraser' ? '#f8fafc' : currentColor, width: strokeWidth, opacity: 1, timestamp: Date.now(), bounds: calculateBounds(pts) };
-      setElements(p => [...p, s]); addToHistory({ type: 'add', elements: [s], timestamp: Date.now() });
+      const s: Stroke = {
+        id: generateId(), type: currentStrokeType, points: pts,
+        color: currentStrokeType === 'eraser' ? '#f8fafc' : currentColor,
+        width: strokeWidth, opacity: 1, timestamp: Date.now(), bounds: calculateBounds(pts),
+      };
+      setElements(p => [...p, s]);
+      history.push({ type: 'add', elementId: s.id, element: s });
+      setHistoryVersion(v => v + 1);
       if (canvasId) emitElementAdd(canvasId, serializeElement(s) as any);
     }
     currentStroke.current = [];
-  }, [isDrawing, isPanning, currentTool, currentStrokeType, currentColor, strokeWidth, opacity, viewport, addToHistory, currentShape, canvasId, emitElementAdd]);
+  }, [isDrawing, isPanning, currentTool, currentStrokeType, currentColor, strokeWidth, opacity, viewport, history, currentShape, canvasId, emitElementAdd]);
 
   const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const canvas = canvasRef.current; if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const cx = e.clientX - rect.left;
-    const cy = e.clientY - rect.top;
-    const delta = e.deltaY > 0 ? -0.08 : 0.08;
-    zoomFn(delta, cx, cy);
+    zoomFn(e.deltaY > 0 ? -0.08 : 0.08, e.clientX - rect.left, e.clientY - rect.top);
   }, [zoomFn]);
 
   useKeyboardShortcuts({
-    onUndo:           () => { const a = undo(); if (a?.type === 'add') setElements(p => p.slice(0, -a.elements.length)); },
-    onRedo:           () => { const a = redo(); if (a?.type === 'add') setElements(p => [...p, ...a.elements]); },
-    onDelete:         () => { if (selectedIds.size > 0) { selectedIds.forEach(id => { if (canvasId) emitElementDelete(canvasId, id); }); setElements(p => p.filter(e => !selectedIds.has(e.id))); clearSelection(); } },
+    onUndo: handleUndo,
+    onRedo: handleRedo,
+    onDelete: () => {
+      if (!canDraw || selectedIds.size === 0) return;
+      const toDelete = elements.filter(e => selectedIds.has(e.id));
+      toDelete.forEach(el => {
+        history.push({ type: 'delete', elementId: el.id, snapshot: el });
+        if (canvasId) emitElementDelete(canvasId, el.id);
+      });
+      setElements(p => p.filter(e => !selectedIds.has(e.id)));
+      setHistoryVersion(v => v + 1);
+      clearSelection();
+    },
     onZoomIn:         zoomIn,
     onZoomOut:        zoomOut,
     onResetZoom:      resetViewport,
@@ -474,10 +612,14 @@ export default function InfiniteWhiteboard({
     onSwitchToPan:    () => setCurrentTool('pan'),
   });
 
+  // Text keyboard handler
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
       if (!isEditingText || !editingTextId) return;
-      if (e.key === 'Escape') { e.preventDefault(); setIsEditingText(false); setEditingTextId(null); setElements(p => p.filter(el => !(isTextElement(el) && el.text === ''))); return; }
+      if (e.key === 'Escape') {
+        e.preventDefault(); setIsEditingText(false); setEditingTextId(null);
+        setElements(p => p.filter(el => !(isTextElement(el) && el.text === ''))); return;
+      }
       if (e.key.length === 1 || ['Backspace', 'Enter', 'Delete'].includes(e.key)) {
         e.preventDefault();
         setElements(prev => prev.map(el => {
@@ -497,8 +639,14 @@ export default function InfiniteWhiteboard({
 
   const handleClearAll = () => {
     if (!canDraw) return;
-    if (window.confirm('Clear the entire canvas?')) { setElements([]); clearSelection(); if (canvasId) emitCanvasClear(canvasId); }
+    if (window.confirm('Clear the entire canvas?')) {
+      setElements([]); clearSelection();
+      if (canvasId) emitCanvasClear(canvasId);
+    }
   };
+
+  // suppress historyVersion lint warning — it's intentionally used to force re-render
+  void historyVersion;
 
   return (
     <div
@@ -529,27 +677,22 @@ export default function InfiniteWhiteboard({
         />
       )}
 
-      {/* TopControls — share button only visible/functional for owner */}
       <TopControls
         canUndo={canUndo} canRedo={canRedo}
-        onUndo={() => { const a = undo(); if (a?.type === 'add') setElements(p => p.slice(0, -a.elements.length)); }}
-        onRedo={() => { const a = redo(); if (a?.type === 'add') setElements(p => [...p, ...a.elements]); }}
+        onUndo={handleUndo} onRedo={handleRedo}
         zoom={viewport.zoom}
-        onZoomIn={zoomIn}
-        onZoomOut={zoomOut}
-        onResetZoom={resetViewport}
-        showGrid={showGrid}
-        onToggleGrid={() => setShowGrid(p => !p)}
+        onZoomIn={zoomIn} onZoomOut={zoomOut} onResetZoom={resetViewport}
+        showGrid={showGrid} onToggleGrid={() => setShowGrid(p => !p)}
         onExport={f => { const c = canvasRef.current; if (c) handleExport(f, c, elements, viewport, getCanvasState()); }}
         onClearAll={handleClearAll}
         onSave={triggerSave}
         lastSaved={lastSaved}
         canvasId={canvasId ?? ''}
         firebaseToken={firebaseToken ?? ''}
-        userRole={effectiveRole}   // TopControls internally hides share for non-owners
+        userRole={effectiveRole}
       />
 
-      {/* Top-right: connection status + active users + avatar */}
+      {/* Top-right: status + users + avatar */}
       <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
         {canvasId && (
           <>
@@ -565,7 +708,6 @@ export default function InfiniteWhiteboard({
         <UserAvatar userName={userName} role={effectiveRole} />
       </div>
 
-      {/* Canvas element */}
       <canvas
         ref={canvasRef}
         onMouseDown={handleMouseDown}
@@ -577,12 +719,14 @@ export default function InfiniteWhiteboard({
         style={{ marginTop: effectiveRole === 'viewer' ? '28px' : 0 }}
       />
 
-      {/* Remote cursors */}
+      {/* Remote cursors — initials + unique color per user */}
       {Object.entries(remoteCursors).map(([sid, cursor]) => (
         <RemoteCursor
-          key={sid} userId={cursor.userId}
+          key={sid}
+          userId={cursor.userId}
           userName={cursor.userName || 'User'}
-          x={cursor.x} y={cursor.y}
+          x={cursor.x}
+          y={cursor.y}
           color={cursor.userColor || '#10b981'}
         />
       ))}
