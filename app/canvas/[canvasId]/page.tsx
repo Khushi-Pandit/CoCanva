@@ -1,11 +1,6 @@
 'use client';
 
 // FILE: app/canvas/[canvasId]/page.tsx
-//
-// Changes:
-// - Reads sessionStorage share token and sends as x-share-token header to REST API  ✓ (was already done)
-// - Also passes raw shareToken down to InfiniteWhiteboard so it can send it in
-//   the socket canvas:join event — backend verifies it against DB for role resolution.
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
@@ -24,7 +19,7 @@ function CanvasPageInner() {
   const [token,      setToken]      = useState('');
   const [userName,   setUserName]   = useState('');
   const [userRole,   setUserRole]   = useState<Role>('viewer');
-  const [shareToken, setShareToken] = useState('');   // raw share token for socket
+  const [shareToken, setShareToken] = useState('');
   const [errMsg,     setErrMsg]     = useState('');
 
   useEffect(() => {
@@ -39,8 +34,19 @@ function CanvasPageInner() {
       try {
         const firebaseToken = await user.getIdToken(true);
 
-        // Share token stored by join/[token]/page.tsx after resolving the invite link
-        const storedShareToken = sessionStorage.getItem(`share_token_${canvasId}`) ?? '';
+        // Read share token — check sessionStorage first, then localStorage.
+        // localStorage is used as fallback because the join page stores it there
+        // so it survives a login redirect (sessionStorage is cleared on navigation).
+        const storedShareToken =
+          sessionStorage.getItem(`share_token_${canvasId}`) ||
+          localStorage.getItem(`share_token_${canvasId}`) ||
+          '';
+
+        // Promote to sessionStorage and clean up localStorage
+        if (storedShareToken) {
+          sessionStorage.setItem(`share_token_${canvasId}`, storedShareToken);
+          localStorage.removeItem(`share_token_${canvasId}`);
+        }
 
         const headers: Record<string, string> = {
           Authorization: `Bearer ${firebaseToken}`,
@@ -77,7 +83,7 @@ function CanvasPageInner() {
         setToken(firebaseToken);
         setUserName(user.displayName || user.email?.split('@')[0] || 'User');
         setUserRole(resolvedRole);
-        setShareToken(storedShareToken);   // pass to socket join
+        setShareToken(storedShareToken);
         setState('ready');
       } catch {
         setState('denied');
@@ -88,7 +94,6 @@ function CanvasPageInner() {
     return () => unsubscribe();
   }, [canvasId, router]);
 
-  // ── Loading ────────────────────────────────────────────────────────────────
   if (state === 'loading') {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-50">
@@ -100,7 +105,6 @@ function CanvasPageInner() {
     );
   }
 
-  // ── Denied ─────────────────────────────────────────────────────────────────
   if (state === 'denied') {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-50">
@@ -134,15 +138,12 @@ function CanvasPageInner() {
     );
   }
 
-  // ── Ready — render the whiteboard ──────────────────────────────────────────
-  // NOTE: owner is kept as 'owner' role — InfiniteWhiteboard decides what
-  // owner can/cannot do. We no longer force-cast owner → editor here.
   const wbProps: InfiniteWhiteboardProps = {
     canvasId,
     firebaseToken: token,
     userName,
     userRole,
-    shareToken,    // socket join needs this to resolve role from DB
+    shareToken,
   };
   return <InfiniteWhiteboard {...wbProps} />;
 }
