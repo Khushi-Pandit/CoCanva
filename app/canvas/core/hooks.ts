@@ -102,15 +102,21 @@ export const useAutoSave = (
 
     try {
       const data = getDataRef.current();
-      const res  = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/canvas/${canvasId}`,
+      // Backend uses POST /canvas/:id/save with { elements[], deletedIds[], viewport? }
+      const payload = {
+        elements:   Array.isArray(data.elements)   ? data.elements   : [],
+        deletedIds: Array.isArray(data.deletedIds) ? data.deletedIds : [],
+        viewport:   data.viewport,
+      };
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/canvas/${canvasId}/save`,
         {
-          method:  'PUT',
+          method:  'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(data),
+          body: JSON.stringify(payload),
         }
       );
 

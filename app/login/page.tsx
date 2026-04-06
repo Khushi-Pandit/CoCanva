@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,11 +28,10 @@ export default function LoginPage() {
       // Step 2: Firebase token lo
       const token = await userCredential.user.getIdToken();
 
-      // Step 3: Backend ko verify + user fetch karne bhejo
+      // Step 3: Backend ko verify + user fetch karne bhejo (token in Authorization header)
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/user/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, token }),
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const data = await res.json();
@@ -42,7 +42,8 @@ export default function LoginPage() {
 
       // Step 4: Token save karo
       localStorage.setItem("token", token);
-      router.push("/dashboard");
+      const redirect = searchParams.get("redirect");
+      router.push(redirect || "/dashboard");
 
     } catch (err: any) {
       if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password") {
@@ -195,5 +196,17 @@ export default function LoginPage() {
         </div>
       </div>
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'linear-gradient(135deg,#d1fae5 0%,#6ee7b7 100%)' }}>
+        <div style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid #10b981', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
+      </div>
+    }>
+      <LoginPageInner />
+    </Suspense>
   );
 }

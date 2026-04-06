@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, Suspense } from "react";
 import Image from "next/image";
 import { Eye, EyeOff } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 
-export default function SignUp() {
+function SignUpInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
@@ -43,11 +44,11 @@ export default function SignUp() {
       const token = await userCredential.user.getIdToken();
       const fId = userCredential.user.uid;
 
-      // Step 3: Backend ko bhejo — MongoDB me save karne ke liye
+      // Step 3: Backend ko bhejo — MongoDB me save karne ke liye (token in Authorization header)
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/user/signup`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, email, token, fId }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ fullName }),
       });
 
       const data = await res.json();
@@ -58,9 +59,10 @@ export default function SignUp() {
         return;
       }
 
-      // Step 4: Token save karo aur Main pe jao
+      // Step 4: Token save karo aur redirect pe jao
       localStorage.setItem("token", token);
-      router.push("/dashboard");
+      const redirect = searchParams.get("redirect");
+      router.push(redirect || "/dashboard");
 
     } catch (err: any) {
       // Firebase error messages
@@ -223,5 +225,17 @@ export default function SignUp() {
         </div>
       </div>
     </>
+  );
+}
+
+export default function SignUp() {
+  return (
+    <Suspense fallback={
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'linear-gradient(135deg,#d1fae5 0%,#6ee7b7 100%)' }}>
+        <div style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid #10b981', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
+      </div>
+    }>
+      <SignUpInner />
+    </Suspense>
   );
 }

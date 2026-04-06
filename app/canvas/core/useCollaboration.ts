@@ -1,10 +1,11 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // FILE: app/canvas/core/useCollaboration.ts
+// UPDATED: Exposes `socket` (Socket | null) and `mySocketId` so the
+//          useVoice hook can piggyback on the SAME connection — no second socket.
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { DrawableElement } from './types';
 
 export interface RemoteUser {
   userId:    string;
@@ -32,11 +33,11 @@ export interface CollaborationOptions {
   userName:      string;
   userRole:      string;
   shareToken?:   string;
-  onElementAdd:    (element: DrawableElement) => void;
+  onElementAdd:    (element: any) => void;
   onElementDelete: (elementId: string) => void;
-  onElementModify: (element: DrawableElement) => void;
+  onElementModify: (element: any) => void;
   onCanvasClear:   () => void;
-  onCanvasState:   (elements: DrawableElement[]) => void;
+  onCanvasState:   (elements: any[]) => void;
   onRoleConfirmed?:      (role: string) => void;
   onRemoteStrokeUpdate?: (socketId: string, stroke: RemoteStroke | null) => void;
 }
@@ -47,22 +48,18 @@ export const useCollaboration = (options: CollaborationOptions | null) => {
   const [isSyncing,     setIsSyncing]     = useState(false);
   const [activeUsers,   setActiveUsers]   = useState<RemoteUser[]>([]);
   const [confirmedRole, setConfirmedRole] = useState<string | null>(null);
+  const [mySocketId,    setMySocketId]    = useState<string>('');
   const [remoteCursors, setRemoteCursors] = useState<
     Record<string, { userId: string; userName: string; userColor: string; x: number; y: number }>
   >({});
 
-  // ── FIX: Store all callbacks in a ref so the socket event handlers always
-  // call the LATEST version without needing to reconnect the socket.
-  // Previously the socket was created once but captured stale closures from
-  // the first render — causing onCanvasState / onElementAdd etc. to silently
-  // do nothing or overwrite state with stale data.
   const cbRef = useRef(options);
   useEffect(() => { cbRef.current = options; });
 
   useEffect(() => {
     if (!options?.canvasId || !options?.firebaseToken) return;
 
-    const { canvasId, firebaseToken, userName, shareToken } = options;
+    const { canvasId, firebaseToken, shareToken } = options;
 
     const socket = io(
       process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000',
@@ -73,21 +70,26 @@ export const useCollaboration = (options: CollaborationOptions | null) => {
     socket.on('connect', () => {
       setIsConnected(true);
       setIsSyncing(true);
-      socket.emit('canvas:join', { canvasId, userName, shareToken: shareToken ?? '' });
+      setMySocketId(socket.id ?? '');
+      socket.emit('canvas:join', { canvasId, shareToken: shareToken ?? undefined });
     });
 
-    socket.on('disconnect',    () => { setIsConnected(false); setIsSyncing(false); });
+    socket.on('disconnect',    () => { setIsConnected(false); setIsSyncing(false); setMySocketId(''); });
     socket.on('connect_error', () => { setIsConnected(false); setIsSyncing(false); });
 
-    socket.on('canvas:role', ({ role }: { role: string }) => {
+    socket.on('canvas:joined', ({ lastViewport }: any) => { void lastViewport; });
+
+    socket.on('canvas:role', ({ role }: { role: string; canvasId: string }) => {
       setConfirmedRole(role);
       cbRef.current?.onRoleConfirmed?.(role);
     });
 
-    socket.on('canvas:state', ({ elements }: { elements: DrawableElement[] }) => {
+    socket.on('canvas:state', ({ elements }: { elements: any[] }) => {
       cbRef.current?.onCanvasState(elements ?? []);
       setIsSyncing(false);
     });
+
+    socket.on('canvas:saved', () => { /* acknowledged */ });
 
     socket.on('users:active', (users: RemoteUser[]) => setActiveUsers(users));
 
@@ -101,16 +103,36 @@ export const useCollaboration = (options: CollaborationOptions | null) => {
       cbRef.current?.onRemoteStrokeUpdate?.(socketId, null);
     });
 
-    socket.on('element:add',    ({ element }: { element: DrawableElement }) =>
-      cbRef.current?.onElementAdd(element));
-    socket.on('element:delete', ({ elementId }: { elementId: string }) =>
-      cbRef.current?.onElementDelete(elementId));
-    socket.on('element:modify', ({ element }: { element: DrawableElement }) =>
-      cbRef.current?.onElementModify(element));
-    socket.on('canvas:clear', () =>
-      cbRef.current?.onCanvasClear());
+    socket.on('element:added', ({ element }: { element: any }) => {
+      cbRef.current?.onElementAdd(element);
+    });
 
-    socket.on('cursor:move', ({
+    socket.on('element:updated', ({ element }: { element: any }) => {
+      cbRef.current?.onElementModify(element);
+    });
+
+    socket.on('element:deleted', ({ elementIds }: { elementIds: string[] }) => {
+      (elementIds ?? []).forEach(id => cbRef.current?.onElementDelete(id));
+    });
+
+    socket.on('elements:batch', ({ added = [], updated = [], deletedIds = [] }: any) => {
+      added.forEach((el: any)        => cbRef.current?.onElementAdd(el));
+      updated.forEach((el: any)      => cbRef.current?.onElementModify(el));
+      deletedIds.forEach((id: string) => cbRef.current?.onElementDelete(id));
+    });
+
+    socket.on('canvas:cleared', () => cbRef.current?.onCanvasClear());
+
+    socket.on('canvas:undo', ({ restored = [], deletedIds = [] }: any) => {
+      restored.forEach((el: any)      => cbRef.current?.onElementAdd(el));
+      deletedIds.forEach((id: string) => cbRef.current?.onElementDelete(id));
+    });
+    socket.on('canvas:redo', ({ restored = [], deletedIds = [] }: any) => {
+      restored.forEach((el: any)      => cbRef.current?.onElementAdd(el));
+      deletedIds.forEach((id: string) => cbRef.current?.onElementDelete(id));
+    });
+
+    socket.on('cursor:moved', ({
       userId, socketId, userName: uName, userColor, x, y,
     }: { userId: string; socketId: string; userName: string; userColor: string; x: number; y: number }) => {
       setRemoteCursors(prev => ({
@@ -119,53 +141,82 @@ export const useCollaboration = (options: CollaborationOptions | null) => {
       }));
     });
 
-    socket.on('stroke:drawing', ({
-      userId, socketId, userName: uName, userColor, points, color, width, strokeType,
-    }: RemoteStroke) => {
+    socket.on('stroke:preview', ({
+      userId, socketId, points, style,
+    }: { userId: string; socketId: string; points: { x: number; y: number }[]; style: any }) => {
+      const userColor = remoteCursors[socketId]?.userColor ?? '#3b82f6';
+      const userName  = remoteCursors[socketId]?.userName  ?? '';
       cbRef.current?.onRemoteStrokeUpdate?.(socketId, {
-        userId, socketId, userName: uName, userColor, points, color, width, strokeType,
+        userId, socketId, userName, userColor,
+        points:     points ?? [],
+        color:      style?.color      ?? userColor,
+        width:      style?.width      ?? 2,
+        strokeType: style?.strokeType ?? 'pen',
       });
     });
 
+    socket.on('element:lock_conflict', () => { /* show toast if needed */ });
+    socket.on('element:persist_error', () => { /* show toast if needed */ });
+
     return () => {
+      socket.emit('canvas:leave');
       socket.disconnect();
       socketRef.current = null;
       setIsConnected(false);
       setIsSyncing(false);
       setActiveUsers([]);
       setRemoteCursors({});
+      setMySocketId('');
     };
-  // Socket is created once per canvasId+token — callbacks stay fresh via cbRef
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options?.canvasId, options?.firebaseToken]);
 
-  // ── Emit helpers — safe: optional chaining means no throw when disconnected
-  const emitElementAdd    = useCallback((cid: string, element: any) =>
-    socketRef.current?.emit('element:add',    { canvasId: cid, element }), []);
-  const emitElementDelete = useCallback((cid: string, elementId: string) =>
-    socketRef.current?.emit('element:delete', { canvasId: cid, elementId }), []);
-  const emitElementModify = useCallback((cid: string, element: any) =>
-    socketRef.current?.emit('element:modify', { canvasId: cid, element }), []);
-  const emitCanvasClear   = useCallback((cid: string) =>
-    socketRef.current?.emit('canvas:clear',   { canvasId: cid }), []);
-  const emitCursorMove    = useCallback((cid: string, x: number, y: number) =>
-    socketRef.current?.emit('cursor:move',    { canvasId: cid, x, y }), []);
-  const emitStrokeDrawing = useCallback((
-    cid: string, points: { x: number; y: number }[],
-    color: string, width: number, strokeType: string,
-  ) => socketRef.current?.emit('stroke:drawing', { canvasId: cid, points, color, width, strokeType }), []);
-  const emitCanvasSave    = useCallback((cid: string, elements: any[], viewport: any) =>
-    socketRef.current?.emit('canvas:save', { canvasId: cid, elements, viewport }), []);
+  // ── Emit helpers ──────────────────────────────────────────────────────────
 
-  const onRemoteStrokeUpdate = useCallback((cid: string, stroke: RemoteStroke | null) => {
-    if (!stroke)
-      socketRef.current?.emit('stroke:drawing', { canvasId: cid, points: [], color: '', width: 0, strokeType: 'pen' });
-  }, []);
+  const emitElementAdd = useCallback((cid: string, element: any) =>
+    socketRef.current?.emit('element:add', { canvasId: cid, element }), []);
+
+  const emitElementDelete = useCallback((cid: string, elementId: string) =>
+    socketRef.current?.emit('element:delete', { canvasId: cid, elementIds: [elementId] }), []);
+
+  const emitElementModify = useCallback((cid: string, element: any) =>
+    socketRef.current?.emit('element:update', { canvasId: cid, element }), []);
+
+  const emitCanvasClear = useCallback((cid: string) =>
+    socketRef.current?.emit('canvas:clear', { canvasId: cid }), []);
+
+  const emitCursorMove = useCallback((cid: string, x: number, y: number) =>
+    socketRef.current?.emit('cursor:move', { canvasId: cid, x, y }), []);
+
+  const emitStrokeDrawing = useCallback((
+    cid: string,
+    points: { x: number; y: number }[],
+    color: string,
+    width: number,
+    strokeType: string,
+  ) => socketRef.current?.emit('stroke:preview', {
+    canvasId: cid,
+    points,
+    style: { color, width, strokeType },
+  }), []);
+
+  const emitCanvasSave = useCallback((cid: string, elements: any[], viewport: any, deletedIds: string[] = []) =>
+    socketRef.current?.emit('canvas:save', { canvasId: cid, elements, deletedIds, viewport }), []);
+
+  const emitElementLock = useCallback((cid: string, elementId: string) =>
+    socketRef.current?.emit('element:lock', { canvasId: cid, elementId }), []);
+
+  const emitElementUnlock = useCallback((cid: string, elementId: string) =>
+    socketRef.current?.emit('element:unlock', { canvasId: cid, elementId }), []);
 
   return {
+    // ── existing ──
     isConnected, isSyncing, activeUsers, remoteCursors, confirmedRole,
     emitElementAdd, emitElementDelete, emitElementModify,
     emitCanvasClear, emitCursorMove, emitStrokeDrawing,
-    emitCanvasSave, onRemoteStrokeUpdate,
+    emitCanvasSave, emitElementLock, emitElementUnlock,
+    // ── NEW: expose socket + mySocketId for useVoice ──
+    socket:     socketRef.current,
+    mySocketId,
   };
 };
