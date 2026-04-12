@@ -89,7 +89,20 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function generateSVG(elements: DrawableElement[], viewport: { x: number; y: number; zoom: number }): string {
+function markerShape(style: string, color: string) {
+  switch (style) {
+    case 'open':
+      return `<path d="M1,1 L8,4 L1,7" fill="none" stroke="${color}" stroke-width="1.6" />`;
+    case 'dot':
+      return `<circle cx="4" cy="4" r="2.4" fill="${color}" />`;
+    case 'diamond':
+      return `<path d="M0,4 L4,1 L8,4 L4,7 Z" fill="${color}" />`;
+    default:
+      return `<path d="M0,0 L8,4 L0,8 Z" fill="${color}" />`;
+  }
+}
+
+function generateSVG(elements: DrawableElement[], _viewport: { x: number; y: number; zoom: number }): string {
   // Determine bounding box
   let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
   for (const el of elements) {
@@ -99,8 +112,8 @@ function generateSVG(elements: DrawableElement[], viewport: { x: number; y: numb
         maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
       }
     } else if ('x' in el && 'y' in el) {
-      const w = 'width' in el ? (el as any).width : 0;
-      const h = 'height' in el ? (el as any).height : 0;
+      const w = 'width' in el ? Number((el as { width?: number }).width ?? 0) : 0;
+      const h = 'height' in el ? Number((el as { height?: number }).height ?? 0) : 0;
       minX = Math.min(minX, el.x); minY = Math.min(minY, el.y);
       maxX = Math.max(maxX, el.x + w); maxY = Math.max(maxY, el.y + h);
     }
@@ -112,6 +125,25 @@ function generateSVG(elements: DrawableElement[], viewport: { x: number; y: numb
     if (el.kind === 'stroke') {
       const d = el.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x - minX + 40},${p.y - minY + 40}`).join(' ');
       return `<path d="${d}" stroke="${el.color}" stroke-width="${el.width}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="${el.opacity}" />`;
+    }
+    if (el.kind === 'connector') {
+      if (!el.points || el.points.length < 2) return '';
+      const pts = el.points.map((p) => ({ x: p.x - minX + 40, y: p.y - minY + 40 }));
+      const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+      const markerEndId = `arrow-end-${el.id}`;
+      const markerStartId = `arrow-start-${el.id}`;
+      const endStyle = el.arrowEnd === false ? 'none' : (el.arrowHeadStyle ?? 'triangle');
+      const startStyle = el.arrowStart ? (el.arrowTailStyle ?? el.arrowHeadStyle ?? 'triangle') : 'none';
+      const defs: string[] = [];
+
+      if (endStyle !== 'none') {
+        defs.push(`<marker id="${markerEndId}" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse">${markerShape(endStyle, el.color)}</marker>`);
+      }
+      if (startStyle !== 'none') {
+        defs.push(`<marker id="${markerStartId}" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse">${markerShape(startStyle, el.color)}</marker>`);
+      }
+
+      return `${defs.length ? `<defs>${defs.join('')}</defs>` : ''}<path d="${d}" stroke="${el.color}" stroke-width="${el.width}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="${el.opacity}" ${el.dashed ? 'stroke-dasharray="8 5"' : ''} ${startStyle !== 'none' ? `marker-start="url(#${markerStartId})"` : ''} ${endStyle !== 'none' ? `marker-end="url(#${markerEndId})"` : ''} />`;
     }
     if (el.kind === 'shape') {
       const x = el.x - minX + 40, y = el.y - minY + 40, w = el.width, h = el.height;

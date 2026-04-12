@@ -4,6 +4,8 @@ export type ElementKind = 'stroke' | 'shape' | 'flowchart' | 'text' | 'connector
 export type StrokeType = 'pen' | 'pencil' | 'marker' | 'brush' | 'eraser';
 export type ShapeType = 'rectangle' | 'circle' | 'triangle' | 'diamond' | 'line' | 'arrow' | 'star';
 export type FlowchartShapeType = 'rectangle' | 'diamond' | 'rounded_rect' | 'parallelogram' | 'cylinder' | 'hexagon' | 'oval' | 'cloud' | 'cross' | 'connector';
+export type ConnectorMode = 'straight' | 'polyline';
+export type ArrowHeadStyle = 'triangle' | 'open' | 'dot' | 'diamond' | 'none';
 
 export interface Point {
   x: number;
@@ -54,9 +56,13 @@ export interface Connector extends ElementBase {
   color: string;
   width: number;
   opacity: number;
+  mode?: ConnectorMode;
   borderRadius?: number;
   dashed?: boolean;
+  arrowStart?: boolean;
   arrowEnd?: boolean;
+  arrowHeadStyle?: ArrowHeadStyle;
+  arrowTailStyle?: ArrowHeadStyle;
   fromId?: string;
   toId?: string;
 }

@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import {
   DrawableElement, ToolMode, StrokeType, ShapeType, FlowchartShapeType,
+  ConnectorMode, ArrowHeadStyle,
 } from '@/types/element';
 import { CanvasRole } from '@/types/canvas';
 
@@ -43,6 +44,10 @@ interface CanvasState {
   opacity: number;
   showGrid: boolean;
   snapToGrid: boolean;
+  connectorMode: ConnectorMode;
+  connectorHead: 'end' | 'both' | 'none';
+  connectorHeadStyle: Exclude<ArrowHeadStyle, 'none'>;
+  connectorRounded: boolean;
   setTool: (t: ToolMode) => void;
   setStrokeType: (t: StrokeType) => void;
   setShapeType: (t: ShapeType) => void;
@@ -53,6 +58,10 @@ interface CanvasState {
   toggleGrid: () => void;
   setShowGrid: (v: boolean) => void;
   toggleSnap: () => void;
+  setConnectorMode: (mode: ConnectorMode) => void;
+  setConnectorHead: (head: 'end' | 'both' | 'none') => void;
+  setConnectorHeadStyle: (style: Exclude<ArrowHeadStyle, 'none'>) => void;
+  setConnectorRounded: (rounded: boolean) => void;
 
   // Selection
   selectedIds: string[];
@@ -119,6 +128,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   opacity: 1,
   showGrid: true,
   snapToGrid: false,
+  connectorMode: 'polyline',
+  connectorHead: 'end',
+  connectorHeadStyle: 'triangle',
+  connectorRounded: true,
 
   setTool: (tool) => set({ tool }),
   setStrokeType: (strokeType) => set({ strokeType }),
@@ -130,6 +143,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
   setShowGrid: (showGrid) => set({ showGrid }),
   toggleSnap: () => set((s) => ({ snapToGrid: !s.snapToGrid })),
+  setConnectorMode: (connectorMode) => set({ connectorMode }),
+  setConnectorHead: (connectorHead) => set({ connectorHead }),
+  setConnectorHeadStyle: (connectorHeadStyle) => set({ connectorHeadStyle }),
+  setConnectorRounded: (connectorRounded) => set({ connectorRounded }),
 
   selectedIds: [],
   setSelectedIds: (selectedIds) => set((s) => {

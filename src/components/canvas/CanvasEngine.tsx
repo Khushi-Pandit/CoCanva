@@ -58,8 +58,66 @@ function renderStroke(ctx: CanvasRenderingContext2D, s: { type: string; points: 
   ctx.restore();
 }
 
+function normalizeConnectorPoints(points: Point[], mode: 'straight' | 'polyline') {
+  if (mode === 'straight' && points.length >= 2) {
+    return [points[0], points[points.length - 1]];
+  }
+  return points;
+}
+
+function renderArrowHead(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  angle: number,
+  size: number,
+  color: string,
+  style: Connector['arrowHeadStyle'],
+) {
+  const type = style ?? 'triangle';
+  if (type === 'none') return;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.setLineDash([]);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+
+  if (type === 'open') {
+    ctx.beginPath();
+    ctx.moveTo(-size, -size * 0.55);
+    ctx.lineTo(0, 0);
+    ctx.lineTo(-size, size * 0.55);
+    ctx.lineWidth = Math.max(1, size * 0.16);
+    ctx.stroke();
+  } else if (type === 'dot') {
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (type === 'diamond') {
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-size * 0.55, -size * 0.38);
+    ctx.lineTo(-size, 0);
+    ctx.lineTo(-size * 0.55, size * 0.38);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-size, -size * 0.5);
+    ctx.lineTo(-size, size * 0.5);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 function renderConnector(ctx: CanvasRenderingContext2D, c: Connector, vp: VP) {
   if (c.points.length < 2) return;
+  const points = normalizeConnectorPoints(c.points, c.mode ?? 'polyline');
   const radius = (c.borderRadius ?? 12) * vp.zoom;
   ctx.save();
   ctx.globalAlpha = c.opacity;
@@ -70,36 +128,57 @@ function renderConnector(ctx: CanvasRenderingContext2D, c: Connector, vp: VP) {
   if (c.dashed) ctx.setLineDash([5 * vp.zoom, 5 * vp.zoom]);
 
   ctx.beginPath();
-  const p0 = { x: c.points[0].x * vp.zoom + vp.x, y: c.points[0].y * vp.zoom + vp.y };
+  const p0 = { x: points[0].x * vp.zoom + vp.x, y: points[0].y * vp.zoom + vp.y };
   ctx.moveTo(p0.x, p0.y);
 
-  for (let i = 1; i < c.points.length - 1; i++) {
-    const p1 = { x: c.points[i].x * vp.zoom + vp.x, y: c.points[i].y * vp.zoom + vp.y };
-    const p2 = { x: c.points[i + 1].x * vp.zoom + vp.x, y: c.points[i + 1].y * vp.zoom + vp.y };
-    ctx.arcTo(p1.x, p1.y, p2.x, p2.y, radius);
+  if ((c.mode ?? 'polyline') === 'straight' || points.length <= 2 || radius <= 0) {
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x * vp.zoom + vp.x, points[i].y * vp.zoom + vp.y);
+    }
+  } else {
+    for (let i = 1; i < points.length - 1; i++) {
+      const p1 = { x: points[i].x * vp.zoom + vp.x, y: points[i].y * vp.zoom + vp.y };
+      const p2 = { x: points[i + 1].x * vp.zoom + vp.x, y: points[i + 1].y * vp.zoom + vp.y };
+      ctx.arcTo(p1.x, p1.y, p2.x, p2.y, radius);
+    }
   }
 
-  const last = { x: c.points[c.points.length - 1].x * vp.zoom + vp.x, y: c.points[c.points.length - 1].y * vp.zoom + vp.y };
+  const last = { x: points[points.length - 1].x * vp.zoom + vp.x, y: points[points.length - 1].y * vp.zoom + vp.y };
   ctx.lineTo(last.x, last.y);
   ctx.stroke();
 
-  // Arrowhead
-  if (c.arrowEnd) {
-    const pPrev = c.points[c.points.length - 2];
-    const pLast = c.points[c.points.length - 1];
-    const angle = Math.atan2(pLast.y - pPrev.y, pLast.x - pPrev.x);
-    const size = 12 * vp.zoom;
-    ctx.fillStyle = c.color;
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.translate(last.x, last.y);
-    ctx.rotate(angle);
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-size, -size * 0.5);
-    ctx.lineTo(-size, size * 0.5);
-    ctx.closePath();
-    ctx.fill();
+  const pStart = points[0];
+  const pNext = points[1];
+  const pPrev = points[points.length - 2];
+  const pLast = points[points.length - 1];
+  const size = 12 * vp.zoom;
+
+  if (c.arrowStart) {
+    const angle = Math.atan2(pStart.y - pNext.y, pStart.x - pNext.x);
+    renderArrowHead(
+      ctx,
+      pStart.x * vp.zoom + vp.x,
+      pStart.y * vp.zoom + vp.y,
+      angle,
+      size,
+      c.color,
+      c.arrowTailStyle ?? c.arrowHeadStyle ?? 'triangle',
+    );
   }
+
+  if (c.arrowEnd !== false) {
+    const angle = Math.atan2(pLast.y - pPrev.y, pLast.x - pPrev.x);
+    renderArrowHead(
+      ctx,
+      pLast.x * vp.zoom + vp.x,
+      pLast.y * vp.zoom + vp.y,
+      angle,
+      size,
+      c.color,
+      c.arrowHeadStyle ?? 'triangle',
+    );
+  }
+
   ctx.restore();
 }
 
@@ -187,6 +266,39 @@ function erasePoint(elements: DrawableElement[], pt: Point, radius: number) {
   return { elements: [...kept, ...added], deleted, added };
 }
 
+function connectorBounds(points: Point[]) {
+  return calculateBounds(points);
+}
+
+function segmentDistance(pt: Point, a: Point, b: Point) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if (dx === 0 && dy === 0) return Math.hypot(pt.x - a.x, pt.y - a.y);
+  const t = Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / (dx * dx + dy * dy)));
+  const projX = a.x + t * dx;
+  const projY = a.y + t * dy;
+  return Math.hypot(pt.x - projX, pt.y - projY);
+}
+
+function isPointNearConnector(pt: Point, c: Connector, tolerance = 10) {
+  for (let i = 0; i < c.points.length - 1; i++) {
+    if (segmentDistance(pt, c.points[i], c.points[i + 1]) <= tolerance) return true;
+  }
+  return false;
+}
+
+function connectorMidpoints(points: Point[]) {
+  const mids: Array<{ x: number; y: number; index: number }> = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    mids.push({
+      x: (points[i].x + points[i + 1].x) / 2,
+      y: (points[i].y + points[i + 1].y) / 2,
+      index: i + 1,
+    });
+  }
+  return mids;
+}
+
 // ── Main Canvas Engine ────────────────────────────────────────────────────────
 interface CanvasEngineProps {
   canEdit: boolean;
@@ -215,7 +327,8 @@ export function CanvasEngine({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { 
-    elements, viewport, tool, strokeType, shapeType, fcShape, color, lineWidth, opacity, showGrid,
+    elements, viewport, tool, strokeType, shapeType, fcShape, color, lineWidth, opacity, showGrid, snapToGrid,
+    connectorMode, connectorHead, connectorHeadStyle, connectorRounded,
     addElement, removeElement, replaceElements, markDeleted, setViewport, pushHistory,
     panViewport, zoomViewport, selectedIds, setSelectedIds, clearSelection, updateElement,
     setTool,
@@ -233,18 +346,30 @@ export function CanvasEngine({
   const lineWidthR   = useRef(lineWidth);
   const opacityR     = useRef(opacity);
   const showGridR    = useRef(showGrid);
+  const snapToGridR  = useRef(snapToGrid);
   const fcShapeR     = useRef(fcShape);
+  const connectorModeR = useRef(connectorMode);
+  const connectorHeadR = useRef(connectorHead);
+  const connectorHeadStyleR = useRef(connectorHeadStyle);
+  const connectorRoundedR = useRef(connectorRounded);
   const remoteStR    = useRef(remoteLiveStrokes);
   const canEditR     = useRef(canEdit);
   
   const snap = useCallback((p: Point) => {
-    if (!showGridR.current) return p;
+    if (!snapToGridR.current) return p;
     const size = 20;
     return {
       x: Math.round(p.x / size) * size,
       y: Math.round(p.y / size) * size
     };
   }, []);
+
+  const getPointForTool = useCallback((rawPoint: Point, activeTool: ToolMode): Point => {
+    if (activeTool === 'draw' || activeTool === 'text' || activeTool === 'select' || activeTool === 'pan') {
+      return rawPoint;
+    }
+    return snap(rawPoint);
+  }, [snap]);
 
   const [activeConnectorPoints, setActiveConnectorPoints] = useState<Point[]>([]);
   const [cursorCanvasPt, setCursorCanvasPt] = useState<Point>({ x: 0, y: 0 });
@@ -261,6 +386,11 @@ export function CanvasEngine({
   lineWidthR.current   = lineWidth;
   opacityR.current     = opacity;
   showGridR.current    = showGrid;
+  snapToGridR.current  = snapToGrid;
+  connectorModeR.current = connectorMode;
+  connectorHeadR.current = connectorHead;
+  connectorHeadStyleR.current = connectorHeadStyle;
+  connectorRoundedR.current = connectorRounded;
   remoteStR.current    = remoteLiveStrokes;
   canEditR.current     = canEdit;
   selectedIdsR.current = selectedIds;
@@ -280,10 +410,16 @@ export function CanvasEngine({
   const selectionHasMoved = useRef(false);
   const thumbnailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Connector node editing
+  const [connectorEditing, setConnectorEditing] = useState<{ id: string; nodeIndex: number } | null>(null);
+  const connectorEditingR = useRef<{ id: string; nodeIndex: number } | null>(null);
+
   // Marquee selection state
   const isMarqueeSelecting = useRef(false);
   const marqueeStart = useRef<Point | null>(null);
   const marqueeEnd   = useRef<Point | null>(null);
+
+  connectorEditingR.current = connectorEditing;
 
   // Debounced thumbnail capture — fires 3s after last drawing event
   const scheduleThumbnail = useCallback(() => {
@@ -296,15 +432,6 @@ export function CanvasEngine({
       const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
       onThumbnailCapture(dataUrl);
     }, 3000);
-  }, [onThumbnailCapture]);
-
-  /** Exposed imperative capture for Ctrl+S immediate thumbnail */
-  const captureThumbnailNow = useCallback(() => {
-    if (!onThumbnailCapture) return;
-    if (thumbnailTimer.current) clearTimeout(thumbnailTimer.current);
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    onThumbnailCapture(canvas.toDataURL('image/jpeg', 0.65));
   }, [onThumbnailCapture]);
 
   // ── RAF render loop ─────────────────────────────────────────────────────────
@@ -334,9 +461,15 @@ export function CanvasEngine({
         if (activeConnectorPoints.length > 0) {
           const previewConnector: Connector = {
             id: 'preview', elementId: 'preview', kind: 'connector',
-            points: [...activeConnectorPoints, cursorCanvasPt],
+            points: normalizeConnectorPoints([...activeConnectorPoints, cursorCanvasPt], connectorModeR.current),
             color: colorR.current, width: lineWidthR.current, opacity: 0.6,
-            timestamp: Date.now(), arrowEnd: true, borderRadius: 12
+            timestamp: Date.now(),
+            mode: connectorModeR.current,
+            borderRadius: connectorRoundedR.current ? 12 : 0,
+            arrowStart: connectorHeadR.current === 'both',
+            arrowEnd: connectorHeadR.current !== 'none',
+            arrowHeadStyle: connectorHeadStyleR.current,
+            arrowTailStyle: connectorHeadR.current === 'both' ? connectorHeadStyleR.current : 'none',
           };
           renderConnector(ctx, previewConnector, vp);
         }
@@ -483,27 +616,81 @@ export function CanvasEngine({
         e.preventDefault();
         spaceDown.current = true;
       }
+
+      if (e.key === 'Backspace' && activeConnectorPoints.length > 0) {
+        e.preventDefault();
+        setActiveConnectorPoints((prev) => prev.slice(0, -1));
+        return;
+      }
+
       if (e.key === 'Enter' || e.key === 'Escape') {
-        if (activeConnectorPoints.length >= 2) {
+        if (activeConnectorPoints.length >= 2 && canEditR.current) {
           const id = generateId();
           const conn: Connector = {
             id, elementId: id, kind: 'connector',
-            points: [...activeConnectorPoints],
+            points: normalizeConnectorPoints([...activeConnectorPoints], connectorModeR.current),
             color: colorR.current, width: lineWidthR.current, opacity: opacityR.current,
-            timestamp: Date.now(), arrowEnd: true, borderRadius: 12
+            timestamp: Date.now(),
+            mode: connectorModeR.current,
+            borderRadius: connectorRoundedR.current ? 12 : 0,
+            dashed: false,
+            arrowStart: connectorHeadR.current === 'both',
+            arrowEnd: connectorHeadR.current !== 'none',
+            arrowHeadStyle: connectorHeadStyleR.current,
+            arrowTailStyle: connectorHeadR.current === 'both' ? connectorHeadStyleR.current : 'none',
           };
           addElement(conn);
           onElementAdd(conn, toAPI(conn));
           pushHistory([...elementsR.current, conn]);
+          scheduleThumbnail();
         }
         setActiveConnectorPoints([]);
+        setConnectorEditing(null);
       }
     };
     const onKeyUp = (e: KeyboardEvent) => { if (e.code === 'Space') spaceDown.current = false; };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     return () => { window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); };
-  }, []);
+  }, [activeConnectorPoints, addElement, onElementAdd, pushHistory, scheduleThumbnail]);
+
+  useEffect(() => {
+    const onPointerMove = (e: PointerEvent) => {
+      const editing = connectorEditingR.current;
+      if (!editing || !canEditR.current) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const r = canvas.getBoundingClientRect();
+      const raw = screenToCanvas(e.clientX - r.left, e.clientY - r.top, vpR.current);
+      const pt = getPointForTool(raw, 'connector');
+
+      const current = elementsR.current.find((el) => isConnector(el) && el.id === editing.id) as Connector | undefined;
+      if (!current || !current.points[editing.nodeIndex]) return;
+
+      const points = [...current.points];
+      points[editing.nodeIndex] = pt;
+      const next = normalizeConnectorPoints(points, current.mode ?? 'polyline');
+      updateElement(current.id, { points: next } as any);
+    };
+
+    const onPointerUp = () => {
+      const editing = connectorEditingR.current;
+      if (!editing) return;
+      connectorEditingR.current = null;
+      setConnectorEditing(null);
+      const after = useCanvasStore.getState().elements.find((el) => el.id === editing.id);
+      if (after) onElementModify(after, toAPI(after));
+      pushHistory([...useCanvasStore.getState().elements]);
+      scheduleThumbnail();
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [getPointForTool, onElementModify, pushHistory, scheduleThumbnail, updateElement]);
 
   // ── Pointer handlers ─────────────────────────────────────────────────────────
   const toPt = useCallback((clientX: number, clientY: number): Point => {
@@ -515,13 +702,73 @@ export function CanvasEngine({
   const onDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.button !== 0) return;
     canvasRef.current!.setPointerCapture(e.pointerId);
-    const pt = snap(toPt(e.clientX, e.clientY));
+    const rawPt = toPt(e.clientX, e.clientY);
     const effectiveTool = spaceDown.current ? 'pan' : toolR.current;
+    const pt = getPointForTool(rawPt, effectiveTool);
 
     if (effectiveTool === 'connector') {
-      setActiveConnectorPoints(prev => [...prev, pt]);
+      if (!canEditR.current) return;
+
+      if (connectorModeR.current === 'straight') {
+        if (activeConnectorPoints.length === 0) {
+          setActiveConnectorPoints([pt]);
+        } else {
+          const points = normalizeConnectorPoints([activeConnectorPoints[0], pt], 'straight');
+          const id = generateId();
+          const conn: Connector = {
+            id, elementId: id, kind: 'connector',
+            points,
+            color: colorR.current,
+            width: lineWidthR.current,
+            opacity: opacityR.current,
+            timestamp: Date.now(),
+            mode: 'straight',
+            borderRadius: 0,
+            dashed: false,
+            arrowStart: connectorHeadR.current === 'both',
+            arrowEnd: connectorHeadR.current !== 'none',
+            arrowHeadStyle: connectorHeadStyleR.current,
+            arrowTailStyle: connectorHeadR.current === 'both' ? connectorHeadStyleR.current : 'none',
+          };
+          addElement(conn);
+          onElementAdd(conn, toAPI(conn));
+          pushHistory([...elementsR.current, conn]);
+          scheduleThumbnail();
+          setActiveConnectorPoints([]);
+        }
+      } else {
+        const next = [...activeConnectorPoints, pt];
+        if (e.detail >= 2 && next.length >= 2) {
+          const id = generateId();
+          const conn: Connector = {
+            id, elementId: id, kind: 'connector',
+            points: normalizeConnectorPoints(next, 'polyline'),
+            color: colorR.current,
+            width: lineWidthR.current,
+            opacity: opacityR.current,
+            timestamp: Date.now(),
+            mode: 'polyline',
+            borderRadius: connectorRoundedR.current ? 12 : 0,
+            dashed: false,
+            arrowStart: connectorHeadR.current === 'both',
+            arrowEnd: connectorHeadR.current !== 'none',
+            arrowHeadStyle: connectorHeadStyleR.current,
+            arrowTailStyle: connectorHeadR.current === 'both' ? connectorHeadStyleR.current : 'none',
+          };
+          addElement(conn);
+          onElementAdd(conn, toAPI(conn));
+          pushHistory([...elementsR.current, conn]);
+          scheduleThumbnail();
+          setActiveConnectorPoints([]);
+        } else {
+          setActiveConnectorPoints(next);
+        }
+      }
+
       return;
     }
+
+    setActiveConnectorPoints([]);
 
     if (effectiveTool === 'pan') { isPanning.current = true; return; }
 
@@ -536,6 +783,11 @@ export function CanvasEngine({
           const { minX, minY, maxX, maxY } = el.bounds;
           if (pt.x >= minX - 10 && pt.x <= maxX + 10 && pt.y >= minY - 10 && pt.y <= maxY + 10) {
             isHit = el.points.some(p => isNear(p, pt, 15));
+          }
+        } else if (isConnector(el)) {
+          const b = connectorBounds(el.points);
+          if (pt.x >= b.minX - 12 && pt.x <= b.maxX + 12 && pt.y >= b.minY - 12 && pt.y <= b.maxY + 12) {
+            isHit = isPointNearConnector(pt, el, 12);
           }
         } else if (isShape(el)) {
           const minX = Math.min(el.x, el.x + el.width);
@@ -557,6 +809,9 @@ export function CanvasEngine({
           } else {
             if (!selectedIdsR.current.includes(el.id)) setSelectedIds([el.id]);
           }
+
+          setConnectorEditing(null);
+
           isDraggingSelection.current = true;
           dragLastPos.current = pt;
           selectionHasMoved.current = false;
@@ -566,6 +821,7 @@ export function CanvasEngine({
 
       // Nothing hit — start marquee or clear selection
       if (!e.shiftKey) clearSelection();
+      setConnectorEditing(null);
       isMarqueeSelecting.current = true;
       marqueeStart.current = pt;
       marqueeEnd.current = pt;
@@ -573,23 +829,35 @@ export function CanvasEngine({
     }
 
     clearSelection();
+    setConnectorEditing(null);
     if (!canEditR.current) return;
 
     drawing.current = true;
-    livePoints.current = [pt];
-    shapeStart.current = pt;
+    const startPoint = effectiveTool === 'draw' ? rawPt : pt;
+    livePoints.current = [startPoint];
+    shapeStart.current = startPoint;
     strokeId.current = generateId();
-    eraserPos.current = pt;
-  }, [toPt, clearSelection, setSelectedIds]);
+    eraserPos.current = rawPt;
+  }, [
+    toPt,
+    clearSelection,
+    setSelectedIds,
+    getPointForTool,
+    activeConnectorPoints,
+    addElement,
+    onElementAdd,
+    pushHistory,
+    scheduleThumbnail,
+  ]);
 
   const onMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const rawPt = toPt(e.clientX, e.clientY);
-    const pt = snap(rawPt);
-    setCursorCanvasPt(pt);
     const effectiveTool = spaceDown.current ? 'pan' : toolR.current;
+    const pt = getPointForTool(rawPt, effectiveTool);
+    setCursorCanvasPt(pt);
 
-    if (effectiveTool === 'draw' && strokeTypeR.current === 'eraser') eraserPos.current = pt;
-    onCursorMove(pt.x, pt.y);
+    if (effectiveTool === 'draw' && strokeTypeR.current === 'eraser') eraserPos.current = rawPt;
+    onCursorMove(rawPt.x, rawPt.y);
 
     if (isPanning.current) { panViewport(e.movementX, e.movementY); return; }
 
@@ -610,6 +878,9 @@ export function CanvasEngine({
         if (isStroke(el)) {
           const shifted = el.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
           return { ...el, points: shifted, bounds: calculateBounds(shifted) };
+        } else if (isConnector(el)) {
+          const shifted = el.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+          return { ...el, points: shifted };
         } else if (isShape(el) || isTextElement(el) || isFlowchart(el)) {
           return { ...el, x: el.x + dx, y: el.y + dy };
         }
@@ -627,9 +898,9 @@ export function CanvasEngine({
 
     if (effectiveTool === 'draw') {
       if (strokeTypeR.current === 'eraser') {
-        eraserPos.current = pt;
+        eraserPos.current = rawPt;
         const radius = lineWidthR.current * 6;
-        const { elements: next, deleted, added } = erasePoint(elementsR.current, pt, radius);
+        const { elements: next, deleted, added } = erasePoint(elementsR.current, rawPt, radius);
         if (deleted.length > 0) {
           replaceElements(() => next);
           deleted.forEach((id) => markDeleted(id));
@@ -637,15 +908,15 @@ export function CanvasEngine({
           added.forEach((el) => onElementAdd(el, toAPI(el)));
         }
       } else {
-        livePoints.current = [...livePoints.current, pt];
+        livePoints.current = [...livePoints.current, rawPt];
         onStrokePreview(livePoints.current, { strokeType: strokeTypeR.current, color: colorR.current, width: lineWidthR.current });
       }
     }
 
-    if (effectiveTool === 'shape') {
+    if (effectiveTool === 'shape' || effectiveTool === 'flowchart') {
       livePoints.current = [shapeStart.current!, pt];
     }
-  }, [toPt, panViewport, replaceElements, markDeleted, onElementAdd, onElementDelete, onCursorMove, onStrokePreview]);
+  }, [toPt, panViewport, replaceElements, markDeleted, onElementAdd, onElementDelete, onCursorMove, onStrokePreview, getPointForTool]);
 
   // Handle global up (catches drops outside canvas)
   useEffect(() => {
@@ -665,6 +936,9 @@ export function CanvasEngine({
               if (isStroke(el) && el.bounds) {
                 return el.bounds.minX >= minX && el.bounds.maxX <= maxX &&
                        el.bounds.minY >= minY && el.bounds.maxY <= maxY;
+              } else if (isConnector(el)) {
+                const b = connectorBounds(el.points);
+                return b.minX >= minX && b.maxX <= maxX && b.minY >= minY && b.maxY <= maxY;
               } else if (isShape(el)) {
                 return el.x >= minX && el.x + el.width <= maxX &&
                        el.y >= minY && el.y + el.height <= maxY;
@@ -707,8 +981,9 @@ export function CanvasEngine({
     if (!drawing.current) return;
     drawing.current = false;
 
-    const pt = toPt(e.clientX, e.clientY);
+    const rawPt = toPt(e.clientX, e.clientY);
     const effectiveTool = spaceDown.current ? 'pan' : toolR.current;
+    const pt = getPointForTool(rawPt, effectiveTool);
 
     if (effectiveTool === 'draw' && canEditR.current && strokeTypeR.current !== 'eraser' && livePoints.current.length >= 2) {
       const id = strokeId.current;
@@ -811,7 +1086,7 @@ export function CanvasEngine({
 
     livePoints.current = [];
     shapeStart.current = null;
-  }, [toPt, addElement, pushHistory, onElementAdd, snap]);
+  }, [toPt, addElement, pushHistory, onElementAdd, getPointForTool, scheduleThumbnail, setSelectedIds, setTool]);
 
   // Cursor style
   const cursorStyle = (() => {
@@ -824,7 +1099,34 @@ export function CanvasEngine({
   })();
 
   const fcElements = elements.filter(isFlowchart) as FlowchartElement[];
+  const connectorElements = elements.filter(isConnector) as Connector[];
   const textElements = elements.filter(isTextElement) as TextElement[];
+  const selectedConnector = selectedIds.length === 1
+    ? connectorElements.find((c) => c.id === selectedIds[0]) ?? null
+    : null;
+
+  const beginConnectorNodeDrag = (id: string, nodeIndex: number) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!canEdit || tool !== 'select') return;
+    e.preventDefault();
+    e.stopPropagation();
+    setConnectorEditing({ id, nodeIndex });
+  };
+
+  const insertConnectorNode = (id: string, index: number, point: Point) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!canEdit || tool !== 'select') return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const connector = elementsR.current.find((el) => isConnector(el) && el.id === id) as Connector | undefined;
+    if (!connector) return;
+
+    const points = [...connector.points];
+    points.splice(index, 0, point);
+    updateElement(id, { points, mode: 'polyline' } as any);
+    const after = useCanvasStore.getState().elements.find((el) => el.id === id);
+    if (after) onElementModify(after, toAPI(after));
+    setConnectorEditing({ id, nodeIndex: index });
+  };
 
   return (
     <div ref={containerRef} id="drawsync-canvas-container" className="relative w-full h-full overflow-hidden">
@@ -875,6 +1177,46 @@ export function CanvasEngine({
           }}
         />
         <TransformOverlay elements={elements} viewport={viewport} onModify={(el) => onElementModify(el, toAPI(el))} />
+        {selectedConnector && tool === 'select' && canEdit && (
+          <>
+            {selectedConnector.points.map((p, idx) => {
+              const size = Math.max(8, 10 * viewport.zoom);
+              const active = connectorEditing?.id === selectedConnector.id && connectorEditing.nodeIndex === idx;
+              return (
+                <div
+                  key={`${selectedConnector.id}-node-${idx}`}
+                  className="absolute pointer-events-auto rounded-full border-2 border-emerald-500 bg-white shadow-sm"
+                  style={{
+                    left: p.x * viewport.zoom + viewport.x - size / 2,
+                    top: p.y * viewport.zoom + viewport.y - size / 2,
+                    width: size,
+                    height: size,
+                    cursor: 'move',
+                    boxShadow: active ? '0 0 0 3px rgba(16,185,129,0.25)' : undefined,
+                  }}
+                  onPointerDown={beginConnectorNodeDrag(selectedConnector.id, idx)}
+                />
+              );
+            })}
+            {connectorMidpoints(selectedConnector.points).map((mid) => {
+              const size = Math.max(6, 8 * viewport.zoom);
+              return (
+                <div
+                  key={`${selectedConnector.id}-mid-${mid.index}`}
+                  className="absolute pointer-events-auto rounded-full border border-emerald-300 bg-emerald-100"
+                  style={{
+                    left: mid.x * viewport.zoom + viewport.x - size / 2,
+                    top: mid.y * viewport.zoom + viewport.y - size / 2,
+                    width: size,
+                    height: size,
+                    cursor: 'copy',
+                  }}
+                  onPointerDown={insertConnectorNode(selectedConnector.id, mid.index, { x: mid.x, y: mid.y })}
+                />
+              );
+            })}
+          </>
+        )}
         {selectedIds.length === 1 && (textElements.find(e => e.id === selectedIds[0]) || fcElements.find(e => e.id === selectedIds[0]) || elements.find(e => e.kind === 'shape' && e.id === selectedIds[0])) && canEdit && (
           <FloatingTextToolbar
             element={(textElements.find(e => e.id === selectedIds[0]) || fcElements.find(e => e.id === selectedIds[0]) || elements.find(e => e.id === selectedIds[0]))! as any}

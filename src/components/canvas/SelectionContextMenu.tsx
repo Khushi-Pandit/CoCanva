@@ -60,6 +60,9 @@ export function SelectionContextMenu({ onDelete, onElementAdd, onElementModify }
       if (isStroke(el)) {
         const shifted = el.points.map(p => ({ x: p.x + 20, y: p.y + 20 }));
         return { ...el, id: newId, elementId: newId, points: shifted, bounds: calculateBounds(shifted), timestamp: Date.now() };
+      } else if ((el as any).kind === 'connector' && Array.isArray((el as any).points)) {
+        const shifted = (el as any).points.map((p: any) => ({ x: p.x + 20, y: p.y + 20 }));
+        return { ...el, id: newId, elementId: newId, points: shifted, timestamp: Date.now() };
       } else {
         return { ...el, id: newId, elementId: newId, x: (el as any).x + 20, y: (el as any).y + 20, timestamp: Date.now() };
       }
