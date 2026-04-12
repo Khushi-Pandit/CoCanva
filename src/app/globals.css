@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── CSS Custom Properties ─────────────────────────────────────────────────── */
+:root {
+  --emerald-500: #10b981;
+  --emerald-600: #059669;
+  --indigo-500:  #6366f1;
+  --slate-100:   #f1f5f9;
+  --slate-200:   #e2e8f0;
+  --slate-300:   #cbd5e1;
+  --slate-400:   #94a3b8;
+  --slate-500:   #64748b;
+  --slate-800:   #1e293b;
+  --border:      #e2e8f0;
+  --bg-panel:    #ffffff;
+  --text-primary:#0f172a;
+}
+
+/* ── Base Layer ──────────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+  html {
+    height: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    height: 100%;
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+}
+
+/* ── Components ─────────────────────────────────────────────────────────────── */
+@layer components {
+
+  .glass {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+  }
+  .glass-dark {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glow-emerald { box-shadow: 0 0 20px rgba(16,185,129,0.3), 0 0 40px rgba(16,185,129,0.1); }
+  .glow-indigo  { box-shadow: 0 0 20px rgba(99,102,241,0.3), 0 0 40px rgba(99,102,241,0.1); }
+
+  /* Toolbar button */
+  .tool-btn {
+    @apply flex items-center justify-center flex-shrink-0 rounded-lg border-none cursor-pointer transition-all duration-150;
+    width: 36px;
+    height: 36px;
+    color: #64748b;
+    background: transparent;
+  }
+  .tool-btn:hover { background: #f1f5f9; color: #1e293b; }
+  .tool-btn.active { background: #10b981 !important; color: white !important; box-shadow: 0 2px 8px rgba(16,185,129,0.35); }
+  .tool-btn.ai-active { background: #6366f1 !important; color: white !important; box-shadow: 0 2px 8px rgba(99,102,241,0.35); }
+
+  /* Input */
+  .input {
+    @apply w-full text-sm outline-none transition-all duration-150;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #0f172a;
+  }
+  .input:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
+  .input::placeholder { color: #94a3b8; }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center font-semibold;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+  }
+
+  /* Skeleton */
+  .skeleton {
+    background: linear-gradient(90deg, #f1f5f9 25%, #f8fafc 50%, #f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
+    border-radius: 8px;
+  }
+}
+
+/* ── Utilities ───────────────────────────────────────────────────────────────── */
+@layer utilities {
+  .animate-fade-in        { animation: fade-in 0.2s ease; }
+  .animate-slide-up       { animation: slide-up 0.25s ease; }
+  .animate-slide-in-right { animation: slide-in-right 0.25s ease; }
+  .animate-pulse-soft     { animation: pulse-soft 2s ease-in-out infinite; }
+  .animate-float          { animation: float 3s ease-in-out infinite; }
+}
+
+/* ── Keyframes ───────────────────────────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
