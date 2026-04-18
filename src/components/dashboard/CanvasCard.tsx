@@ -16,27 +16,56 @@ interface CanvasCardProps {
 export function CanvasCard({ canvas, onRename, onDelete, onDuplicate, onRestore }: CanvasCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const AvatarGroup = () => (
-    <div className="flex -space-x-1.5">
-      {canvas.collaborators.slice(0, 3).map((c) => {
-        const id = typeof c.user === 'object' ? (c.user as any)._id : c.user;
-        const name = typeof c.user === 'object' ? (c.user as any).fullName : 'Collaborator';
-        return (
-          <div key={String(id)}
+  const AvatarGroup = () => {
+    // Gather collaborators with valid populated user objects (not just IDs)
+    const validCollabs = (canvas.collaborators || []).filter((c) => {
+      if (typeof c.user === 'object' && c.user !== null) {
+        const name = (c.user as any).fullName || (c.user as any).email;
+        return !!name;
+      }
+      return false;
+    });
+
+    // Also include the canvas owner as an avatar if they're not already in collaborators
+    const ownerName = canvas.owner?.fullName || canvas.owner?.email;
+    const ownerId = canvas.owner?._id;
+    const ownerInCollabs = validCollabs.some((c) => (c.user as any)?._id === ownerId);
+    const showOwner = ownerName && !ownerInCollabs && validCollabs.length === 0;
+
+    const avatarsToShow = validCollabs.slice(0, 3);
+
+    return (
+      <div className="flex -space-x-1.5">
+        {showOwner && (
+          <div
             className="w-5 h-5 rounded-full border border-white bg-emerald-500 flex items-center justify-center text-[8px] font-bold text-white"
-            title={name}
+            title={ownerName}
           >
-            {getInitials(name)}
+            {getInitials(ownerName)}
           </div>
-        );
-      })}
-      {canvas.collaborators.length > 3 && (
-        <div className="w-5 h-5 rounded-full border border-white bg-slate-200 flex items-center justify-center text-[8px] font-medium text-slate-500">
-          +{canvas.collaborators.length - 3}
-        </div>
-      )}
-    </div>
-  );
+        )}
+        {avatarsToShow.map((c) => {
+          const user = c.user as any;
+          const id = user?._id || String(c.user);
+          const name = user?.fullName || user?.email || '';
+          const initials = getInitials(name);
+          return (
+            <div key={String(id)}
+              className="w-5 h-5 rounded-full border border-white bg-emerald-500 flex items-center justify-center text-[8px] font-bold text-white"
+              title={name}
+            >
+              {initials}
+            </div>
+          );
+        })}
+        {validCollabs.length > 3 && (
+          <div className="w-5 h-5 rounded-full border border-white bg-slate-200 flex items-center justify-center text-[8px] font-medium text-slate-500">
+            +{validCollabs.length - 3}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div
@@ -71,8 +100,8 @@ export function CanvasCard({ canvas, onRename, onDelete, onDuplicate, onRestore 
             ? <Globe size={11} className="text-sky-400" />
             : <Lock size={11} className="text-slate-300" />}
 
-          {/* Collaborators */}
-          {canvas.collaborators && canvas.collaborators.length > 0 && <AvatarGroup />}
+          {/* Collaborators + owner avatar */}
+          <AvatarGroup />
 
           {/* Menu */}
           <div className="relative">

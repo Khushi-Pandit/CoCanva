@@ -185,53 +185,107 @@ function renderConnector(ctx: CanvasRenderingContext2D, c: Connector, vp: VP) {
 function renderShape(ctx: CanvasRenderingContext2D, shape: Shape, vp: VP) {
   const sx = shape.x * vp.zoom + vp.x, sy = shape.y * vp.zoom + vp.y;
   const sw = shape.width * vp.zoom, sh = shape.height * vp.zoom;
+  const br = (shape.borderRadius ?? 0) * vp.zoom;
   ctx.save();
   ctx.globalAlpha = shape.opacity;
   ctx.strokeStyle = shape.color;
   ctx.lineWidth = shape.strokeWidth * vp.zoom;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   if (shape.fillColor && shape.fillColor !== 'transparent') ctx.fillStyle = shape.fillColor;
   ctx.beginPath();
   switch (shape.type) {
     case 'rectangle': 
-      if (shape.borderRadius && ctx.roundRect) {
-        ctx.roundRect(sx, sy, sw, sh, shape.borderRadius * vp.zoom);
+      if (br > 0 && ctx.roundRect) {
+        ctx.roundRect(sx, sy, sw, sh, br);
+      } else if (br > 0) {
+        // Fallback rounded rect via arcTo
+        const r = Math.min(br, sw / 2, sh / 2);
+        ctx.moveTo(sx + r, sy);
+        ctx.lineTo(sx + sw - r, sy); ctx.arcTo(sx + sw, sy, sx + sw, sy + r, r);
+        ctx.lineTo(sx + sw, sy + sh - r); ctx.arcTo(sx + sw, sy + sh, sx + sw - r, sy + sh, r);
+        ctx.lineTo(sx + r, sy + sh); ctx.arcTo(sx, sy + sh, sx, sy + sh - r, r);
+        ctx.lineTo(sx, sy + r); ctx.arcTo(sx, sy, sx + r, sy, r);
+        ctx.closePath();
       } else {
         ctx.rect(sx, sy, sw, sh);
       }
       break;
     case 'circle':    ctx.ellipse(sx + sw / 2, sy + sh / 2, sw / 2, sh / 2, 0, 0, Math.PI * 2); break;
-    case 'triangle':  ctx.moveTo(sx + sw / 2, sy); ctx.lineTo(sx + sw, sy + sh); ctx.lineTo(sx, sy + sh); ctx.closePath(); break;
-    case 'diamond':   ctx.moveTo(sx + sw / 2, sy); ctx.lineTo(sx + sw, sy + sh / 2); ctx.lineTo(sx + sw / 2, sy + sh); ctx.lineTo(sx, sy + sh / 2); ctx.closePath(); break;
+    case 'triangle': {
+      if (br > 0) {
+        // Rounded triangle
+        const p1 = { x: sx + sw / 2, y: sy };
+        const p2 = { x: sx + sw, y: sy + sh };
+        const p3 = { x: sx, y: sy + sh };
+        const r = Math.min(br, sw * 0.2, sh * 0.2);
+        const len12 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        const len23 = Math.hypot(p3.x - p2.x, p3.y - p2.y);
+        const len31 = Math.hypot(p1.x - p3.x, p1.y - p3.y);
+        ctx.moveTo(
+          p1.x + r * (p2.x - p1.x) / len12,
+          p1.y + r * (p2.y - p1.y) / len12,
+        );
+        ctx.arcTo(p2.x, p2.y, p3.x + r * (p2.x - p3.x) / len23, p3.y + r * (p2.y - p3.y) / len23, r);
+        ctx.arcTo(p3.x, p3.y, p1.x + r * (p3.x - p1.x) / len31, p1.y + r * (p3.y - p1.y) / len31, r);
+        ctx.arcTo(p1.x, p1.y, p1.x + r * (p2.x - p1.x) / len12, p1.y + r * (p2.y - p1.y) / len12, r);
+      } else {
+        ctx.moveTo(sx + sw / 2, sy); ctx.lineTo(sx + sw, sy + sh); ctx.lineTo(sx, sy + sh);
+      }
+      ctx.closePath(); break;
+    }
+    case 'diamond': {
+      const cx = sx + sw / 2, cy = sy + sh / 2;
+      if (br > 0) {
+        const pts = [
+          { x: cx, y: sy }, { x: sx + sw, y: cy },
+          { x: cx, y: sy + sh }, { x: sx, y: cy },
+        ];
+        const r = Math.min(br * 0.5, sw * 0.08, sh * 0.08);
+        ctx.moveTo((pts[0].x + pts[1].x) / 2, (pts[0].y + pts[1].y) / 2);
+        for (let i = 0; i < 4; i++) {
+          const next = pts[(i + 1) % 4];
+          ctx.arcTo(pts[i].x, pts[i].y, (pts[i].x + next.x) / 2, (pts[i].y + next.y) / 2, r);
+          ctx.lineTo((pts[i].x + next.x) / 2, (pts[i].y + next.y) / 2);
+        }
+      } else {
+        ctx.moveTo(cx, sy); ctx.lineTo(sx + sw, cy); ctx.lineTo(cx, sy + sh); ctx.lineTo(sx, cy);
+      }
+      ctx.closePath(); break;
+    }
     case 'line':      ctx.moveTo(sx, sy + sh / 2); ctx.lineTo(sx + sw, sy + sh / 2); break;
     case 'star': {
-      const cx = sx + sw / 2;
-      const cy = sy + sh / 2;
+      const cx = sx + sw / 2, cy = sy + sh / 2;
       const outerRadius = Math.min(sw, sh) / 2;
       const innerRadius = outerRadius / 2.5;
       const spikes = 5;
-      let rot = Math.PI / 2 * 3;
-      let x = cx;
-      let y = cy;
-      const step = Math.PI / spikes;
-      ctx.moveTo(cx, cy - outerRadius);
-      for (let i = 0; i < spikes; i++) {
-        x = cx + Math.cos(rot) * outerRadius;
-        y = cy + Math.sin(rot) * outerRadius;
-        ctx.lineTo(x, y);
-        rot += step;
-        x = cx + Math.cos(rot) * innerRadius;
-        y = cy + Math.sin(rot) * innerRadius;
-        ctx.lineTo(x, y);
-        rot += step;
+      for (let i = 0; i < spikes * 2; i++) {
+        const angle = (i * Math.PI) / spikes - Math.PI / 2;
+        const r = i % 2 === 0 ? outerRadius : innerRadius;
+        if (i === 0) ctx.moveTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+        else ctx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
       }
-      ctx.lineTo(cx, cy - outerRadius);
       ctx.closePath();
       break;
     }
     case 'arrow': {
-      const ah = sh * 0.35;
-      ctx.moveTo(sx, sy + sh / 2); ctx.lineTo(sx + sw * 0.75, sy + sh / 2);
-      ctx.moveTo(sx + sw, sy + sh / 2); ctx.lineTo(sx + sw * 0.7, sy + sh / 2 - ah); ctx.lineTo(sx + sw * 0.7, sy + sh / 2 + ah); ctx.closePath();
+      // Beautiful filled arrow — shaft + arrowhead as single cohesive shape
+      const headW = sh * 0.7;          // width of arrowhead
+      const headLen = sw * 0.35;       // length of arrowhead
+      const shaftH = sh * 0.32;        // height of shaft
+      const shaftY1 = sy + (sh - shaftH) / 2;
+      const shaftY2 = sy + (sh + shaftH) / 2;
+      const arrowTipX = sx + sw;
+      const arrowBaseX = sx + sw - headLen;
+      // Shaft left → arrowhead base → tip → arrowhead base other side → shaft right
+      ctx.moveTo(sx, shaftY1);
+      ctx.lineTo(arrowBaseX, shaftY1);
+      ctx.lineTo(arrowBaseX, sy + (sh - headW) / 2);
+      ctx.lineTo(arrowTipX, sy + sh / 2);
+      ctx.lineTo(arrowBaseX, sy + (sh + headW) / 2);
+      ctx.lineTo(arrowBaseX, shaftY2);
+      ctx.lineTo(sx, shaftY2);
+      ctx.closePath();
       break;
     }
     default: ctx.rect(sx, sy, sw, sh);
@@ -372,7 +426,9 @@ export function CanvasEngine({
   }, [snap]);
 
   const [activeConnectorPoints, setActiveConnectorPoints] = useState<Point[]>([]);
-  const [cursorCanvasPt, setCursorCanvasPt] = useState<Point>({ x: 0, y: 0 });
+  // Use a ref for cursor position so the RAF render loop always reads the latest value.
+  // (React state updates are async and would be stale inside the render loop closure)
+  const cursorCanvasPtR = useRef<Point>({ x: 0, y: 0 });
 
   const selectedIdsR = useRef(selectedIds);
 
@@ -457,12 +513,13 @@ export function CanvasEngine({
           else if (isConnector(el)) renderConnector(ctx, el, vp);
         }
 
-        // Live connector preview
+        // Live connector preview — show placed nodes + rubber-band line to cursor
         if (activeConnectorPoints.length > 0) {
+          const pts = normalizeConnectorPoints([...activeConnectorPoints, cursorCanvasPtR.current], connectorModeR.current);
           const previewConnector: Connector = {
             id: 'preview', elementId: 'preview', kind: 'connector',
-            points: normalizeConnectorPoints([...activeConnectorPoints, cursorCanvasPt], connectorModeR.current),
-            color: colorR.current, width: lineWidthR.current, opacity: 0.6,
+            points: pts,
+            color: colorR.current, width: lineWidthR.current, opacity: 0.65,
             timestamp: Date.now(),
             mode: connectorModeR.current,
             borderRadius: connectorRoundedR.current ? 12 : 0,
@@ -472,16 +529,79 @@ export function CanvasEngine({
             arrowTailStyle: connectorHeadR.current === 'both' ? connectorHeadStyleR.current : 'none',
           };
           renderConnector(ctx, previewConnector, vp);
+          // Draw placed node dots so user can see where they clicked
+          ctx.save();
+          for (const pt of activeConnectorPoints) {
+            ctx.beginPath();
+            ctx.arc(pt.x * vp.zoom + vp.x, pt.y * vp.zoom + vp.y, 5 * vp.zoom, 0, Math.PI * 2);
+            ctx.fillStyle = colorR.current;
+            ctx.globalAlpha = 0.85;
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+          ctx.restore();
         }
 
         // Ghost shape preview (Stamp mode)
         if (toolR.current === 'shape' && !drawing.current && !activeConnectorPoints.length) {
           const ghost: Shape = {
             id: 'ghost', elementId: 'ghost', kind: 'shape',
-            type: shapeTypeR.current, x: cursorCanvasPt.x - 80, y: cursorCanvasPt.y - 40, width: 160, height: 80,
-            color: colorR.current, fillColor: 'transparent', opacity: 0.3, strokeWidth: 2, rotation: 0, timestamp: 0
+            type: shapeTypeR.current, x: cursorCanvasPtR.current.x - 80, y: cursorCanvasPtR.current.y - 40, width: 160, height: 80,
+            color: colorR.current, fillColor: 'transparent', opacity: 0.25, strokeWidth: 2, rotation: 0, timestamp: 0
           };
           renderShape(ctx, ghost, vp);
+        }
+
+        // Ghost flowchart preview — show translucent shape outline following cursor
+        if (toolR.current === 'flowchart' && !drawing.current && !activeConnectorPoints.length) {
+          const defaults = FLOWCHART_DEFAULTS[fcShapeR.current];
+          const gw = defaults.width, gh = defaults.height;
+          // Draw as a canvas ghost (approximate preview for all FC shapes)
+          ctx.save();
+          ctx.globalAlpha = 0.22;
+          ctx.strokeStyle = defaults.color;
+          ctx.fillStyle = defaults.fillColor;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 3]);
+          const gx = cursorCanvasPtR.current.x * vp.zoom + vp.x - (gw * vp.zoom) / 2;
+          const gy = cursorCanvasPtR.current.y * vp.zoom + vp.y - (gh * vp.zoom) / 2;
+          const gW = gw * vp.zoom, gH = gh * vp.zoom;
+          ctx.beginPath();
+          switch (fcShapeR.current) {
+            case 'rectangle':    ctx.roundRect ? ctx.roundRect(gx, gy, gW, gH, 2) : ctx.rect(gx, gy, gW, gH); break;
+            case 'rounded_rect': ctx.roundRect ? ctx.roundRect(gx, gy, gW, gH, 10) : ctx.rect(gx, gy, gW, gH); break;
+            case 'oval':         ctx.ellipse(gx + gW/2, gy + gH/2, gW/2, gH/2, 0, 0, Math.PI*2); break;
+            case 'diamond': {
+              const cx = gx + gW/2, cy = gy + gH/2;
+              ctx.moveTo(cx, gy); ctx.lineTo(gx+gW, cy); ctx.lineTo(cx, gy+gH); ctx.lineTo(gx, cy);
+              ctx.closePath(); break;
+            }
+            case 'parallelogram': ctx.moveTo(gx+gW*0.1, gy); ctx.lineTo(gx+gW, gy); ctx.lineTo(gx+gW*0.9, gy+gH); ctx.lineTo(gx, gy+gH); ctx.closePath(); break;
+            case 'hexagon': {
+              const pts = [[25,0],[75,0],[100,50],[75,100],[25,100],[0,50]];
+              pts.forEach(([px, py], i) => {
+                const fx = gx + (px/100)*gW, fy = gy + (py/100)*gH;
+                i === 0 ? ctx.moveTo(fx, fy) : ctx.lineTo(fx, fy);
+              }); ctx.closePath(); break;
+            }
+            case 'cylinder':     ctx.ellipse(gx + gW/2, gy + gH/2, gW/2, gH/2, 0, 0, Math.PI*2); break;
+            default:             ctx.rect(gx, gy, gW, gH);
+          }
+          ctx.fill();
+          ctx.stroke();
+          // Draw crosshair at center
+          ctx.globalAlpha = 0.4;
+          ctx.setLineDash([]);
+          const ccx = gx + gW/2, ccy = gy + gH/2;
+          ctx.beginPath();
+          ctx.moveTo(ccx - 8, ccy); ctx.lineTo(ccx + 8, ccy);
+          ctx.moveTo(ccx, ccy - 8); ctx.lineTo(ccx, ccy + 8);
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = defaults.color;
+          ctx.stroke();
+          ctx.restore();
         }
 
         // Ghost elements (AI-generated, pending acceptance)
@@ -623,7 +743,15 @@ export function CanvasEngine({
         return;
       }
 
-      if (e.key === 'Enter' || e.key === 'Escape') {
+      // Escape: DISCARD connector in progress
+      if (e.key === 'Escape') {
+        setActiveConnectorPoints([]);
+        setConnectorEditing(null);
+        return;
+      }
+
+      // Enter: FINALIZE connector if we have at least 2 points
+      if (e.key === 'Enter') {
         if (activeConnectorPoints.length >= 2 && canEditR.current) {
           const id = generateId();
           const conn: Connector = {
@@ -854,7 +982,7 @@ export function CanvasEngine({
     const rawPt = toPt(e.clientX, e.clientY);
     const effectiveTool = spaceDown.current ? 'pan' : toolR.current;
     const pt = getPointForTool(rawPt, effectiveTool);
-    setCursorCanvasPt(pt);
+    cursorCanvasPtR.current = pt; // Update ref directly — RAF loop always reads latest
 
     if (effectiveTool === 'draw' && strokeTypeR.current === 'eraser') eraserPos.current = rawPt;
     onCursorMove(rawPt.x, rawPt.y);

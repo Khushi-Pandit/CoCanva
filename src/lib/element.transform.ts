@@ -55,10 +55,12 @@ export function fromAPI(raw: any): DrawableElement | null {
     }
 
     if (raw.type === 'shape' || raw.kind === 'shape') {
-      const isFC = raw.isFlowchartEl || FLOWCHART_SUBTYPES.has(raw.subtype) || (raw.label !== undefined && raw.label !== null);
+      const isFC = raw.isFlowchartEl || FLOWCHART_SUBTYPES.has(raw.subtype) || FLOWCHART_SUBTYPES.has(raw.shapeType) || (typeof raw.label === 'string' && raw.label.length > 0);
       if (isFC) {
         return {
-          id, elementId: id, kind: 'flowchart', shapeType: (raw.subtype ?? raw.shapeType ?? 'rectangle') as FlowchartShapeType,
+          id, elementId: id, kind: 'flowchart',
+          // Priority: shapeType field first (most explicit), then subtype, fallback to rectangle
+          shapeType: (raw.shapeType ?? raw.subtype ?? 'rectangle') as FlowchartShapeType,
           x: raw.x ?? 0, y: raw.y ?? 0, width: raw.width ?? 100, height: raw.height ?? 60,
           label: raw.label ?? '', color: raw.strokeColor ?? raw.color ?? '#2563eb',
           fillColor: raw.fillColor ?? '#dbeafe', strokeWidth: raw.strokeWidth ?? 2,
@@ -67,13 +69,17 @@ export function fromAPI(raw: any): DrawableElement | null {
           timestamp: raw.timestamp ?? Date.now(), createdBy: raw.createdBy,
         } as FlowchartElement;
       }
+      // === CRITICAL FIX: read shape type from multiple fields, priority: shapeType > subtype > fallback ===
+      const shapeType = (raw.metadata?.shapeType ?? raw.customData?.shapeType ?? raw.shapeType ?? raw.subtype ?? 'rectangle') as ShapeType;
       return {
         id, elementId: id, kind: 'shape',
-        type: (raw.subtype ?? raw.shapeType ?? raw.type ?? 'rectangle') as ShapeType,
+        type: shapeType,
         x: raw.x ?? 0, y: raw.y ?? 0, width: raw.width ?? 100, height: raw.height ?? 100,
         color: raw.strokeColor ?? raw.color ?? '#2563eb',
         fillColor: raw.fillColor, strokeWidth: raw.strokeWidth ?? 2,
         opacity: raw.opacity ?? 1, rotation: raw.rotation ?? 0,
+        // === FIX: deserialize borderRadius ===
+        borderRadius: raw.metadata?.borderRadius ?? raw.customData?.borderRadius ?? raw.borderRadius ?? raw.roundness ?? undefined,
         timestamp: raw.timestamp ?? Date.now(), createdBy: raw.createdBy,
       } as Shape;
     }
@@ -117,7 +123,8 @@ export function toAPI(el: DrawableElement): any {
     if (el.shapeType === 'connector') {
       return { ...base, type: 'connector', subtype: 'straight', x: el.x, y: el.y, width: el.width, height: el.height ?? 0, rotation: el.rotation ?? 0, strokeColor: el.color, fillColor: el.fillColor, strokeWidth: el.strokeWidth, opacity: el.opacity, fromElementId: el.fromId, toElementId: el.toId, points: el.points, dashed: el.dashed, arrowEnd: el.arrowEnd, label: el.label };
     }
-    return { ...base, type: 'shape', subtype: el.shapeType, x: el.x, y: el.y, width: el.width, height: el.height, rotation: el.rotation ?? 0, label: el.label ?? '', strokeColor: el.color, fillColor: el.fillColor, strokeWidth: el.strokeWidth, opacity: el.opacity, fontSize: el.fontSize, fontFamily: el.fontFamily, isFlowchartEl: true };
+    // === FIX: send both subtype AND shapeType for redundancy ===
+    return { ...base, type: 'shape', subtype: el.shapeType, shapeType: el.shapeType, x: el.x, y: el.y, width: el.width, height: el.height, rotation: el.rotation ?? 0, label: el.label ?? '', strokeColor: el.color, fillColor: el.fillColor, strokeWidth: el.strokeWidth, opacity: el.opacity, fontSize: el.fontSize, fontFamily: el.fontFamily, isFlowchartEl: true };
   }
 
   if (el.kind === 'connector') {
@@ -155,7 +162,25 @@ export function toAPI(el: DrawableElement): any {
   }
 
   if (el.kind === 'shape') {
-    return { ...base, type: 'shape', subtype: el.type, x: el.x, y: el.y, width: el.width, height: el.height, rotation: el.rotation ?? 0, strokeColor: el.color, fillColor: el.fillColor, strokeWidth: el.strokeWidth, opacity: el.opacity };
+    // === CRITICAL FIX: send shapeType as BOTH subtype AND shapeType field ===
+    // This ensures the backend always has the correct shape type regardless of which field it reads
+    return {
+      ...base,
+      type: 'shape',
+      subtype: el.type,         // primary field backend may use
+      shapeType: el.type,       // redundant explicit field for safety
+      metadata: { shapeType: el.type, borderRadius: el.borderRadius }, // fallback object 1
+      customData: { shapeType: el.type, borderRadius: el.borderRadius }, // fallback object 2
+      x: el.x, y: el.y,
+      width: el.width, height: el.height,
+      rotation: el.rotation ?? 0,
+      strokeColor: el.color,
+      fillColor: el.fillColor,
+      strokeWidth: el.strokeWidth,
+      opacity: el.opacity,
+      // === FIX: always persist borderRadius ===
+      borderRadius: el.borderRadius ?? undefined,
+    };
   }
 
   if (el.kind === 'text') {

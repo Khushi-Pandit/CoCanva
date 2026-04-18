@@ -9,7 +9,7 @@ import { useVoice } from '@/lib/socket/useVoice';
 import { canvasApi } from '@/lib/api/canvas.api';
 import { elementApi } from '@/lib/api/element.api';
 import { exportCanvas } from '@/lib/export';
-import { toAPI, generateId } from '@/lib/element.transform';
+import { toAPI, generateId, fromAPI } from '@/lib/element.transform';
 import { DrawableElement, FlowchartElement, FLOWCHART_DEFAULTS, isStroke, isShape, isFlowchart, isTextElement, isConnector } from '@/types/element';
 import { CanvasEngine } from '@/components/canvas/CanvasEngine';
 import { Toolbar } from '@/components/canvas/Toolbar';
@@ -20,6 +20,7 @@ import { VoiceRoom } from '@/components/voice/VoiceRoom';
 import { ShareModal } from '@/components/share/ShareModal';
 import { AnnotationsPanel } from '@/components/canvas/AnnotationsPanel';
 import { BranchHistoryPanel } from '@/components/canvas/BranchHistoryPanel';
+import { ConnectorStylePanel } from '@/components/canvas/ConnectorStylePanel';
 import { ToastContainer } from '@/components/ui/Toast';
 import { thumbnailApi } from '@/lib/api/ai.api';
 
@@ -58,9 +59,33 @@ export default function CanvasPage() {
       const t = await getToken() ?? '';
       setToken(t);
       try {
+        // Reset socket elements flag so fresh canvas starts clean
+        useCanvasStore.getState().setSocketElementsLoaded(false);
         // Pass shareToken so backend resolveRole() grants access via share link
         const { canvas } = await canvasApi.get(canvasId, shareToken);
         init({ canvasId, title: canvas.title, role: canvas.myRole ?? 'viewer', shareToken });
+
+        // ── Fallback REST load (production reliability fix) ────────────────
+        // If socket doesn't deliver canvas:state within 4s, load elements from REST API directly.
+        // This fixes the issue where in production the socket is slower than the page render
+        // causing a blank canvas that only loads after manual refresh.
+        const fallbackTimer = setTimeout(async () => {
+          const { elements: currentEls } = useCanvasStore.getState();
+          if (currentEls.length === 0 && !useCanvasStore.getState().socketElementsLoaded) {
+            try {
+              const { elements: apiEls } = await elementApi.getAll(canvasId, shareToken);
+              const parsed = (apiEls ?? []).map(fromAPI).filter((e): e is DrawableElement => e !== null);
+              if (parsed.length > 0) {
+                useCanvasStore.getState().setSocketElementsLoaded(true);
+                useCanvasStore.getState().setElements(parsed);
+              }
+            } catch {
+              // Silent fallback failure — socket may still deliver
+            }
+          }
+        }, 2500);
+
+        return () => clearTimeout(fallbackTimer);
       } catch (err: any) {
         const msg = err?.response?.data?.error?.message ?? 'Failed to load canvas';
         addToast(msg, 'error');
@@ -410,6 +435,9 @@ export default function CanvasPage() {
 
       {/* Left toolbar */}
       {canEdit && <Toolbar canEdit={canEdit} onStyleChange={handleStyleChange} />}
+
+      {/* Connector style panel — slides up from bottom-left when connector tool active */}
+      {canEdit && <ConnectorStylePanel />}
 
       {/* Top bar */}
       <TopBar

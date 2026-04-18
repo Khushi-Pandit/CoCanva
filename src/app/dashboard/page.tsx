@@ -11,12 +11,84 @@ import { ToastContainer } from '@/components/ui/Toast';
 import {
   Plus, Search, LayoutGrid, List, Bell, Settings, LogOut,
   Star, Users, Clock, Trash2, Sparkles, ChevronRight, Loader2,
+  MoreVertical, Pencil, Copy, Lock, Globe,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getInitials, timeAgo } from '@/lib/utils';
 
 type Section = 'my' | 'shared' | 'recent';
+
+// ── List Row Component ─────────────────────────────────────────────────────
+function ListRow({ canvas, onRename, onDelete, onDuplicate }: {
+  canvas: Canvas;
+  onRename: (id: string, title: string) => void;
+  onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  return (
+    <div className="relative group flex items-center gap-3 px-3 py-2.5 bg-white border border-slate-200 rounded-xl hover:shadow-sm hover:border-slate-300 transition-all">
+      {/* Thumbnail */}
+      <Link href={`/canvas/${canvas._id}`} className="flex-shrink-0 w-12 h-9 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+        {canvas.thumbnail ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={canvas.thumbnail} alt={canvas.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="flex flex-col items-center gap-0.5 opacity-25">
+            <div className="w-6 h-4 border border-slate-400 rounded" />
+            <div className="w-4 h-0.5 bg-slate-400 rounded" />
+          </div>
+        )}
+      </Link>
+
+      {/* Info */}
+      <Link href={`/canvas/${canvas._id}`} className="flex-1 min-w-0">
+        <p className="text-[13px] font-semibold text-slate-800 truncate">{canvas.title}</p>
+        <p className="text-[11px] text-slate-400">{timeAgo(canvas.updatedAt)}</p>
+      </Link>
+
+      {/* Role + visibility */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {canvas.isPublic
+          ? <Globe size={11} className="text-sky-400" />
+          : <Lock size={11} className="text-slate-300" />}
+        <span className="text-[10px] badge bg-slate-50 border border-slate-200 text-slate-500 hidden sm:inline-flex">{canvas.myRole ?? 'owner'}</span>
+      </div>
+
+      {/* Three-dot menu */}
+      <div className="relative flex-shrink-0">
+        <button
+          onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-all"
+        >
+          <MoreVertical size={14} />
+        </button>
+        {menuOpen && (
+          <div
+            className="absolute right-0 bottom-full mb-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 min-w-[150px] z-50 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {[
+              { label: 'Open', icon: ChevronRight, action: () => { window.location.href = `/canvas/${canvas._id}`; } },
+              { label: 'Rename', icon: Pencil, action: () => { const t = prompt('New title:', canvas.title); if (t) onRename(canvas._id, t); } },
+              { label: 'Duplicate', icon: Copy, action: () => onDuplicate(canvas._id) },
+              { label: 'Delete', icon: Trash2, action: () => { if (confirm('Delete this canvas?')) onDelete(canvas._id); }, danger: true },
+            ].map(({ label, icon: Icon, action, danger }) => (
+              <button key={label} onClick={() => { action(); setMenuOpen(false); }}
+                className={`flex items-center gap-2.5 w-full px-3 py-1.5 text-xs font-medium transition-all hover:bg-slate-50 ${
+                  danger ? 'text-red-500' : 'text-slate-600'
+                }`}>
+                <Icon size={12} /> {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -283,18 +355,15 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {filteredCanvases.map((c) => (
-                <Link key={c._id} href={`/canvas/${c._id}`}
-                  className="flex items-center gap-4 px-4 py-3 bg-white border border-slate-200 rounded-xl hover:shadow-sm hover:border-slate-300 transition-all group">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{c.title}</p>
-                    <p className="text-xs text-slate-400">{timeAgo(c.updatedAt)}</p>
-                  </div>
-                  <span className="text-[10px] badge bg-slate-50 border border-slate-200 text-slate-500">{c.myRole ?? 'owner'}</span>
-                  <ChevronRight size={14} className="text-slate-300 group-hover:text-slate-500 transition-all" />
-                </Link>
+                <ListRow
+                  key={c._id}
+                  canvas={c}
+                  onRename={renameCanvas}
+                  onDelete={deleteCanvas}
+                  onDuplicate={duplicateCanvas}
+                />
               ))}
             </div>
           )}

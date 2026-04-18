@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Undo2, Redo2, ZoomIn, ZoomOut, Grid3X3, Save, Download,
   Share2, GitBranch, MessageSquare, Users, Wifi, WifiOff,
-  ChevronRight, Settings, Loader2, Home,
+  ChevronRight, Settings, Loader2, Home, Image, FileCode, FileText, FileJson,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCanvasStore } from '@/store/canvas.store';
@@ -29,11 +29,25 @@ export function TopBar({ onUndo, onRedo, onSave, onExport, canUndo, canRedo, can
 
   const [editingTitle, setEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState(canvasTitle);
+  const [exportOpen, setExportOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setTempTitle(canvasTitle);
   }, [canvasTitle]);
+
+  // Close export popup when clicking outside
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handler);
+    return () => window.removeEventListener('mousedown', handler);
+  }, [exportOpen]);
 
   const handleTitleSubmit = async () => {
     setEditingTitle(false);
@@ -158,17 +172,39 @@ export function TopBar({ onUndo, onRedo, onSave, onExport, canUndo, canRedo, can
         </button>
       )}
 
-      {/* Export */}
-      <div className="relative group">
-        <IconBtn icon={Download} label="Export" />
-        <div className="absolute top-full mt-1 right-0 hidden group-hover:flex flex-col gap-0.5 bg-white border border-slate-200 rounded-xl shadow-lg p-1 min-w-[120px] z-50 animate-slide-up">
-          {(['png', 'svg', 'pdf', 'json'] as const).map((fmt) => (
-            <button key={fmt} onClick={() => onExport(fmt)}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-lg capitalize">
-              <Download size={11} /> Export as {fmt.toUpperCase()}
-            </button>
-          ))}
-        </div>
+      {/* Export — click-based beautiful dropdown */}
+      <div className="relative" ref={exportRef}>
+        <button
+          onClick={() => setExportOpen(v => !v)}
+          title="Export"
+          className={cn('tool-btn', exportOpen && 'bg-slate-100 text-slate-800')}
+        >
+          <Download size={15} />
+        </button>
+        {exportOpen && (
+          <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 z-50 animate-slide-up" style={{ minWidth: 200 }}>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1.5">Export As</p>
+            {([
+              { fmt: 'png' as const, icon: Image, label: 'PNG Image', desc: 'High quality raster' },
+              { fmt: 'svg' as const, icon: FileCode, label: 'SVG Vector', desc: 'Scalable vector file' },
+              { fmt: 'pdf' as const, icon: FileText, label: 'PDF Document', desc: 'Print-ready format' },
+              { fmt: 'json' as const, icon: FileJson, label: 'JSON Data', desc: 'Raw canvas data' },
+            ]).map(({ fmt, icon: Icon, label, desc }) => (
+              <button key={fmt}
+                onClick={() => { onExport(fmt); setExportOpen(false); }}
+                className="w-full flex items-center gap-3 px-2.5 py-2 text-left rounded-xl hover:bg-slate-50 transition-colors group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-emerald-50 flex items-center justify-center transition-colors flex-shrink-0">
+                  <Icon size={14} className="text-slate-500 group-hover:text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-[12px] font-semibold text-slate-700">{label}</p>
+                  <p className="text-[10px] text-slate-400">{desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <span className="text-slate-300">|</span>

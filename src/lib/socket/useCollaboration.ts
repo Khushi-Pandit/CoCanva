@@ -26,7 +26,7 @@ export function useCollaboration({ canvasId, token, shareToken, onCanvasJoined }
 
   const {
     addElement, updateElement, removeElement,
-    clearElements, setElements, setViewport,
+    clearElements, setElements, setViewport, setSocketElementsLoaded,
   } = useCanvasStore();
 
   useEffect(() => {
@@ -58,6 +58,9 @@ export function useCollaboration({ canvasId, token, shareToken, onCanvasJoined }
     // payload: { elements, canvasId, snapshotSeq }
     const onCanvasState = (data: { elements: unknown[] }) => {
       const els = (data.elements ?? []).map(fromAPI).filter((e): e is DrawableElement => e !== null);
+      // RACE CONDITION FIX: mark that socket has delivered elements BEFORE setting them.
+      // This ensures init() (which may fire after) won't wipe these elements.
+      setSocketElementsLoaded(true);
       setElements(els);
     };
 

@@ -82,6 +82,8 @@ interface CanvasState {
   setLastSaved: (d: Date) => void;
 
   // Init
+  socketElementsLoaded: boolean;
+  setSocketElementsLoaded: (v: boolean) => void;
   init: (opts: { canvasId: string; title: string; role: CanvasRole; shareToken?: string }) => void;
 }
 
@@ -96,6 +98,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   elements: [],
   deletedIds: [],
+  socketElementsLoaded: false,
+  setSocketElementsLoaded: (socketElementsLoaded) => set({ socketElementsLoaded }),
 
   setElements: (elements) => set({ elements }),
   addElement: (el) => set((s) => ({ elements: s.elements.find((e) => e.id === el.id) ? s.elements : [...s.elements, el] })),
@@ -196,6 +200,24 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   lastSaved: null,
   setLastSaved: (lastSaved) => set({ lastSaved }),
 
-  init: ({ canvasId, title, role, shareToken }) =>
-    set({ canvasId, canvasTitle: title, role, shareToken, elements: [], deletedIds: [], selectedIds: [], history: [], historyIndex: -1 }),
+  init: ({ canvasId, title, role, shareToken }) => {
+    const state = get();
+    // RACE CONDITION FIX: if socket already loaded elements before init() ran,
+    // preserve them instead of wiping. Only clear elements if we're switching canvases.
+    const isNewCanvas = state.canvasId !== canvasId;
+    set({
+      canvasId,
+      canvasTitle: title,
+      role,
+      shareToken,
+      // Only clear elements if this is a different canvas (navigating away)
+      // If same canvas or socketElementsLoaded already, keep existing elements
+      elements: isNewCanvas ? [] : state.elements,
+      deletedIds: isNewCanvas ? [] : state.deletedIds,
+      selectedIds: [],
+      history: [],
+      historyIndex: -1,
+      socketElementsLoaded: isNewCanvas ? false : state.socketElementsLoaded,
+    });
+  },
 }));
