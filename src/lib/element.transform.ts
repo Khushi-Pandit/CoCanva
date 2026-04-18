@@ -1,6 +1,7 @@
 // ── Element serialization: API ↔ DrawableElement ───────────────────────────────
 import {
-  DrawableElement, Stroke, Shape, FlowchartElement, TextElement, StrokeType, FlowchartShapeType, ShapeType,
+  DrawableElement, Stroke, Shape, FlowchartElement, TextElement, Connector,
+  StrokeType, FlowchartShapeType, ShapeType,
 } from '@/types/element';
 
 const FLOWCHART_SUBTYPES = new Set(['diamond', 'rounded_rect', 'parallelogram', 'cylinder', 'hexagon', 'connector']);
@@ -26,19 +27,31 @@ export function fromAPI(raw: any): DrawableElement | null {
       } as Stroke;
     }
 
-    if (raw.type === 'connector' || (raw.kind === 'flowchart' && raw.shapeType === 'connector')) {
+    if (raw.type === 'connector' || raw.kind === 'connector' || (raw.kind === 'flowchart' && raw.shapeType === 'connector')) {
+      const points = Array.isArray(raw.points) && raw.points.length >= 2
+        ? raw.points
+        : [
+            raw.fromPoint ?? { x: raw.x ?? 0, y: raw.y ?? 0 },
+            raw.toPoint ?? { x: (raw.x ?? 0) + (raw.width ?? 0), y: (raw.y ?? 0) + (raw.height ?? 0) },
+          ];
+
       return {
-        id, elementId: id, kind: 'flowchart', shapeType: 'connector',
-        x: raw.x ?? 0, y: raw.y ?? 0, width: raw.width ?? 0, height: raw.height ?? 0,
-        label: raw.label ?? '', color: raw.strokeColor ?? raw.color ?? '#6b7280',
-        fillColor: raw.fillColor ?? 'transparent', strokeWidth: raw.strokeWidth ?? 2,
-        opacity: raw.opacity ?? 1, rotation: raw.rotation ?? 0,
-        fontSize: raw.fontSize ?? 13, fontFamily: raw.fontFamily ?? 'Inter, sans-serif',
+        id, elementId: id, kind: 'connector',
+        points,
+        color: raw.strokeColor ?? raw.color ?? '#6b7280',
+        width: raw.strokeWidth ?? raw.width ?? 2,
+        opacity: raw.opacity ?? 1,
+        mode: (raw.subtype === 'straight' ? 'straight' : 'polyline'),
+        borderRadius: raw.roundness ?? raw.borderRadius ?? 12,
+        dashed: raw.dashed ?? false,
+        arrowStart: raw.arrowStart ?? false,
+        arrowEnd: raw.arrowEnd ?? true,
+        arrowHeadStyle: raw.arrowHeadStyle ?? 'triangle',
+        arrowTailStyle: raw.arrowTailStyle ?? (raw.arrowStart ? 'triangle' : 'none'),
         timestamp: raw.timestamp ?? Date.now(), createdBy: raw.createdBy,
         fromId: raw.fromElementId ?? raw.fromId,
         toId: raw.toElementId ?? raw.toId,
-        points: raw.points, dashed: raw.dashed, arrowEnd: raw.arrowEnd,
-      } as FlowchartElement;
+      } as Connector;
     }
 
     if (raw.type === 'shape' || raw.kind === 'shape') {
@@ -105,6 +118,40 @@ export function toAPI(el: DrawableElement): any {
       return { ...base, type: 'connector', subtype: 'straight', x: el.x, y: el.y, width: el.width, height: el.height ?? 0, rotation: el.rotation ?? 0, strokeColor: el.color, fillColor: el.fillColor, strokeWidth: el.strokeWidth, opacity: el.opacity, fromElementId: el.fromId, toElementId: el.toId, points: el.points, dashed: el.dashed, arrowEnd: el.arrowEnd, label: el.label };
     }
     return { ...base, type: 'shape', subtype: el.shapeType, x: el.x, y: el.y, width: el.width, height: el.height, rotation: el.rotation ?? 0, label: el.label ?? '', strokeColor: el.color, fillColor: el.fillColor, strokeWidth: el.strokeWidth, opacity: el.opacity, fontSize: el.fontSize, fontFamily: el.fontFamily, isFlowchartEl: true };
+  }
+
+  if (el.kind === 'connector') {
+    const pts = el.points;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
+    }
+    if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 0; maxY = 0; }
+
+    return {
+      ...base,
+      type: 'connector',
+      subtype: el.mode ?? (el.points.length === 2 ? 'straight' : 'polyline'),
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+      fromPoint: el.points[0],
+      toPoint: el.points[el.points.length - 1],
+      points: el.points,
+      strokeColor: el.color,
+      strokeWidth: el.width,
+      opacity: el.opacity,
+      dashed: el.dashed ?? false,
+      fromElementId: el.fromId,
+      toElementId: el.toId,
+      arrowStart: el.arrowStart ?? false,
+      arrowEnd: el.arrowEnd ?? true,
+      arrowHeadStyle: el.arrowHeadStyle ?? 'triangle',
+      arrowTailStyle: el.arrowTailStyle ?? ((el.arrowStart ?? false) ? 'triangle' : 'none'),
+      roundness: el.borderRadius ?? 12,
+    };
   }
 
   if (el.kind === 'shape') {

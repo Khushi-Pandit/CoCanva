@@ -1,9 +1,9 @@
 'use client';
 
 import { useCanvasStore } from '@/store/canvas.store';
-import { DrawableElement, isStroke, isShape, isFlowchart, isTextElement } from '@/types/element';
+import { DrawableElement, isStroke, isShape, isFlowchart, isTextElement, isConnector } from '@/types/element';
 import { calculateBounds, toAPI } from '@/lib/element.transform';
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface TransformOverlayProps {
   elements: DrawableElement[];
@@ -21,6 +21,10 @@ function computeUnionBounds(els: DrawableElement[]): { minX: number; minY: numbe
     if (isStroke(el) && el.bounds) {
       minX = Math.min(minX, el.bounds.minX); minY = Math.min(minY, el.bounds.minY);
       maxX = Math.max(maxX, el.bounds.maxX); maxY = Math.max(maxY, el.bounds.maxY);
+    } else if (isConnector(el) && el.points.length > 0) {
+      const b = calculateBounds(el.points);
+      minX = Math.min(minX, b.minX); minY = Math.min(minY, b.minY);
+      maxX = Math.max(maxX, b.maxX); maxY = Math.max(maxY, b.maxY);
     } else if (isShape(el) || isFlowchart(el) || isTextElement(el)) {
       const ex = (el as any).x ?? 0;
       const ey = (el as any).y ?? 0;
@@ -88,6 +92,12 @@ export function TransformOverlay({ elements, viewport: vp, onModify }: Transform
             y: newMinY + (p.y - origBounds.minY) * scaleY,
           }));
           updateElement(startEl.id, { points: newPoints, bounds: calculateBounds(newPoints) });
+        } else if (isConnector(startEl)) {
+          const points = startEl.points.map((p: any) => ({
+            x: newMinX + (p.x - origBounds.minX) * scaleX,
+            y: newMinY + (p.y - origBounds.minY) * scaleY,
+          }));
+          updateElement(startEl.id, { points });
         } else if (isTextElement(startEl)) {
           const relX = startEl.x - origBounds.minX;
           const relY = startEl.y - origBounds.minY;
@@ -162,7 +172,6 @@ export function TransformOverlay({ elements, viewport: vp, onModify }: Transform
         if (pos.includes('s')) hTop = '100%';
 
         const handleColor = isMulti ? '#8b5cf6' : '#3b82f6';
-        const borderColor = isMulti ? '#7c3aed' : '#1d4ed8';
 
         return (
           <div

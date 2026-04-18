@@ -9,8 +9,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ToolMode, StrokeType, ShapeType, FlowchartShapeType } from '@/types/element';
-import { Grid3X3 } from 'lucide-react';
+import { ToolMode, StrokeType, ShapeType, FlowchartShapeType, DrawableElement } from '@/types/element';
 
 const STROKE_TOOLS: { type: StrokeType; label: string; Icon: React.ElementType }[] = [
   { type: 'pen',     label: 'Pen',     Icon: PenLine },
@@ -47,19 +46,41 @@ const COLORS = [
   '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#ffffff',
 ];
 
+const CONNECTOR_MODES: Array<{ value: 'straight' | 'polyline'; label: string }> = [
+  { value: 'straight', label: 'Straight' },
+  { value: 'polyline', label: 'Flexible' },
+];
+
+const CONNECTOR_HEADS: Array<{ value: 'end' | 'both' | 'none'; label: string }> = [
+  { value: 'end', label: 'Single head' },
+  { value: 'both', label: 'Double head' },
+  { value: 'none', label: 'No head' },
+];
+
+const CONNECTOR_HEAD_STYLES: Array<{ value: 'triangle' | 'open' | 'dot' | 'diamond'; label: string }> = [
+  { value: 'triangle', label: 'Triangle' },
+  { value: 'open', label: 'Open' },
+  { value: 'dot', label: 'Dot' },
+  { value: 'diamond', label: 'Diamond' },
+];
+
 interface ToolbarProps { 
   canEdit: boolean; 
-  onStyleChange?: (updates: Partial<any>) => void;
+  onStyleChange?: (updates: Partial<DrawableElement>) => void;
 }
 
 export function Toolbar({ canEdit, onStyleChange }: ToolbarProps) {
   const { tool, strokeType, shapeType, fcShape, color, lineWidth, opacity,
-    setTool, setStrokeType, setShapeType, setFcShape, setColor, setLineWidth, setOpacity } = useCanvasStore();
+    connectorMode, connectorHead, connectorHeadStyle, connectorRounded,
+    setTool, setStrokeType, setShapeType, setFcShape, setColor, setLineWidth, setOpacity,
+    setConnectorMode, setConnectorHead, setConnectorHeadStyle, setConnectorRounded,
+  } = useCanvasStore();
   const { togglePanel, aiChatOpen } = useUIStore();
 
   const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
   const [fcMenuOpen, setFcMenuOpen] = useState(false);
   const [drawMenuOpen, setDrawMenuOpen] = useState(false);
+  const [connectorMenuOpen, setConnectorMenuOpen] = useState(false);
 
   const ToolBtn = ({ t, icon: Icon, label, active, onClick = () => setTool(t as ToolMode) }:
     { t?: string; icon: React.ElementType; label: string; active: boolean; onClick?: () => void }) => (
@@ -165,18 +186,99 @@ export function Toolbar({ canEdit, onStyleChange }: ToolbarProps) {
       <ToolBtn t="text" icon={Type} label="Text (T)" active={tool === 'text'} />
 
       {/* Connector (Multi-node) */}
-      <ToolBtn t="connector" icon={ArrowRight} label="Smart Connector" active={tool === 'connector'} />
+      <div className="relative">
+        <button
+          onClick={() => { setTool('connector'); setConnectorMenuOpen(!connectorMenuOpen); }}
+          className={cn('tool-btn', tool === 'connector' && 'active')}
+          title="Arrow"
+        >
+          <ArrowRight size={16} />
+          <ChevronDown size={10} className="absolute bottom-0.5 right-0.5 opacity-60" />
+        </button>
+        {connectorMenuOpen && (
+          <div className="absolute left-full ml-2 top-0 bg-white border border-slate-200 rounded-xl shadow-lg p-2 flex flex-col gap-2 min-w-[210px] animate-slide-up">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Arrow Type</p>
+              <div className="grid grid-cols-2 gap-1">
+                {CONNECTOR_MODES.map((mode) => (
+                  <button
+                    key={mode.value}
+                    onClick={() => { setTool('connector'); setConnectorMode(mode.value); }}
+                    className={cn(
+                      'px-2 py-1 rounded-lg text-[11px] font-medium transition-all',
+                      connectorMode === mode.value ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'
+                    )}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Heads</p>
+              <div className="grid grid-cols-1 gap-1">
+                {CONNECTOR_HEADS.map((head) => (
+                  <button
+                    key={head.value}
+                    onClick={() => { setTool('connector'); setConnectorHead(head.value); }}
+                    className={cn(
+                      'px-2 py-1 rounded-lg text-[11px] font-medium text-left transition-all',
+                      connectorHead === head.value ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'
+                    )}
+                  >
+                    {head.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Head Style</p>
+              <div className="grid grid-cols-2 gap-1">
+                {CONNECTOR_HEAD_STYLES.map((style) => (
+                  <button
+                    key={style.value}
+                    onClick={() => { setTool('connector'); setConnectorHeadStyle(style.value); }}
+                    className={cn(
+                      'px-2 py-1 rounded-lg text-[11px] font-medium transition-all',
+                      connectorHeadStyle === style.value ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'
+                    )}
+                  >
+                    {style.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Corners</p>
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  onClick={() => { setTool('connector'); setConnectorRounded(true); }}
+                  className={cn(
+                    'px-2 py-1 rounded-lg text-[11px] font-medium transition-all',
+                    connectorRounded ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'
+                  )}
+                >
+                  Rounded
+                </button>
+                <button
+                  onClick={() => { setTool('connector'); setConnectorRounded(false); }}
+                  className={cn(
+                    'px-2 py-1 rounded-lg text-[11px] font-medium transition-all',
+                    !connectorRounded ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'
+                  )}
+                >
+                  Sharp
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="w-full h-px bg-slate-200 my-0.5" />
-
-      {/* Grid Toggle */}
-      <button 
-        onClick={() => useCanvasStore.getState().setShowGrid(!useCanvasStore.getState().showGrid)}
-        className={cn('tool-btn', useCanvasStore.getState().showGrid && 'active')}
-        title="Toggle Grid"
-      >
-        <Grid3X3 size={16} />
-      </button>
 
       {/* Color picker */}
       <div className="relative group">

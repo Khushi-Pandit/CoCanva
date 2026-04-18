@@ -10,7 +10,7 @@ import { canvasApi } from '@/lib/api/canvas.api';
 import { elementApi } from '@/lib/api/element.api';
 import { exportCanvas } from '@/lib/export';
 import { toAPI, generateId } from '@/lib/element.transform';
-import { DrawableElement, FlowchartElement, FLOWCHART_DEFAULTS, isStroke, isShape, isFlowchart, isTextElement } from '@/types/element';
+import { DrawableElement, FlowchartElement, FLOWCHART_DEFAULTS, isStroke, isShape, isFlowchart, isTextElement, isConnector } from '@/types/element';
 import { CanvasEngine } from '@/components/canvas/CanvasEngine';
 import { Toolbar } from '@/components/canvas/Toolbar';
 import { TopBar } from '@/components/canvas/TopBar';
@@ -266,7 +266,7 @@ export default function CanvasPage() {
              if (pastedEl.y !== undefined) pastedEl.y += 20;
              if (pastedEl.points) {
                pastedEl.points = pastedEl.points.map((p: any) => ({ x: p.x + 20, y: p.y + 20 }));
-               pastedEl.bounds = null; // Forces recalculation during render
+               if (pastedEl.kind === 'stroke') pastedEl.bounds = null; // Forces recalculation during render
              }
              
              addElement(pastedEl);
@@ -294,7 +294,7 @@ export default function CanvasPage() {
              if (dupedEl.y !== undefined) dupedEl.y += 20;
              if (dupedEl.points) {
                dupedEl.points = dupedEl.points.map((p: any) => ({ x: p.x + 20, y: p.y + 20 }));
-               dupedEl.bounds = null;
+               if (dupedEl.kind === 'stroke') dupedEl.bounds = null;
              }
              addElement(dupedEl);
              emitElementAdd(toAPI(dupedEl));
@@ -324,6 +324,9 @@ export default function CanvasPage() {
             if (isStroke(el)) {
               const shifted = el.points.map(p => ({ x: p.x + moveX, y: p.y + moveY }));
               updateElement(id, { points: shifted, bounds: null } as any);
+            } else if (isConnector(el)) {
+              const shifted = el.points.map(p => ({ x: p.x + moveX, y: p.y + moveY }));
+              updateElement(id, { points: shifted } as any);
             } else if (isShape(el) || isFlowchart(el) || isTextElement(el)) {
               updateElement(id, { x: (el as any).x + moveX, y: (el as any).y + moveY } as any);
             }
