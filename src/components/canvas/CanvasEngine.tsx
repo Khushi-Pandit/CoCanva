@@ -364,6 +364,10 @@ interface CanvasEngineProps {
   onCanvasClear: () => void;
   onCanvasSave: () => void;
   onThumbnailCapture?: (dataUrl: string) => void;
+  // Page mode — renders a fixed white page on a warm background instead of infinite grid
+  pageMode?: boolean;
+  pageWidth?: number;   // canvas units e.g. 794 for A4
+  pageHeight?: number;  // canvas units e.g. 1123 for A4
 }
 
 export function CanvasEngine({
@@ -376,6 +380,9 @@ export function CanvasEngine({
   onCanvasClear: _onCanvasClear,
   onCanvasSave: _onCanvasSave,
   onThumbnailCapture,
+  pageMode = false,
+  pageWidth = 794,
+  pageHeight = 1123,
 }: CanvasEngineProps) {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -408,6 +415,9 @@ export function CanvasEngine({
   const connectorRoundedR = useRef(connectorRounded);
   const remoteStR    = useRef(remoteLiveStrokes);
   const canEditR     = useRef(canEdit);
+  const pageModeR    = useRef(pageMode);
+  const pageWidthR   = useRef(pageWidth);
+  const pageHeightR  = useRef(pageHeight);
   
   const snap = useCallback((p: Point) => {
     if (!snapToGridR.current) return p;
@@ -450,6 +460,9 @@ export function CanvasEngine({
   remoteStR.current    = remoteLiveStrokes;
   canEditR.current     = canEdit;
   selectedIdsR.current = selectedIds;
+  pageModeR.current    = pageMode;
+  pageWidthR.current   = pageWidth;
+  pageHeightR.current  = pageHeight;
 
   // Drawing state
   const drawing      = useRef(false);
@@ -501,10 +514,67 @@ export function CanvasEngine({
         const w = canvas.width;
         const h = canvas.height;
         ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = '#fafafa';
-        ctx.fillRect(0, 0, w, h);
 
-        if (showGridR.current) renderGrid(ctx, vp, w, h);
+        if (pageModeR.current) {
+          // ── Page mode: warm desk background + white paper page ──
+          ctx.fillStyle = '#f0ede8';
+          ctx.fillRect(0, 0, w, h);
+
+          const vp = vpR.current;
+          const pw = pageWidthR.current * vp.zoom;
+          const ph = pageHeightR.current * vp.zoom;
+          const px = vp.x;
+          const py = vp.y;
+
+          // Page shadow (4 semi-transparent rects offset)
+          ctx.save();
+          ctx.shadowColor = 'rgba(0,0,0,0.18)';
+          ctx.shadowBlur = 32;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 8;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(px, py, pw, ph);
+          ctx.restore();
+
+          // White page fill (crisp, on top of shadow)
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(px, py, pw, ph);
+
+          // Optional rule lines inside page (every 32px scaled)
+          if (showGridR.current) {
+            const lineSpacing = 32 * vp.zoom;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(180,190,210,0.35)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            for (let ly = py + lineSpacing; ly < py + ph; ly += lineSpacing) {
+              ctx.moveTo(px + 20 * vp.zoom, ly);
+              ctx.lineTo(px + pw - 20 * vp.zoom, ly);
+            }
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          // Dim mask outside page (soft boundary)
+          ctx.save();
+          ctx.fillStyle = 'rgba(160,150,140,0.08)';
+          // top
+          ctx.fillRect(0, 0, w, py);
+          // bottom
+          ctx.fillRect(0, py + ph, w, h - py - ph);
+          // left
+          ctx.fillRect(0, py, px, ph);
+          // right
+          ctx.fillRect(px + pw, py, w - px - pw, ph);
+          ctx.restore();
+
+        } else {
+          // ── Normal infinite canvas mode ──
+          ctx.fillStyle = '#fafafa';
+          ctx.fillRect(0, 0, w, h);
+          if (showGridR.current) renderGrid(ctx, vpR.current, w, h);
+        }
 
         for (const el of elementsR.current) {
           if ((el as any).isGhostSuggestion) continue;

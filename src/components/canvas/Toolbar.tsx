@@ -242,30 +242,14 @@ export function Toolbar({ canEdit, onStyleChange }: ToolbarProps) {
         <Type size={16} />
       </button>
 
-      {/* Connector */}
-      <div className="relative">
-        <button
-          onClick={() => { setTool('connector'); toggleMenu('connector'); }}
-          title="Connector"
-          className={cn('tool-btn relative', tool === 'connector' && 'active')}
-        >
-          {connectorMode === 'polyline' ? <FlexLineIcon size={16} /> : <StraightLineIcon size={16} />}
-          <span className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-current opacity-50" />
-        </button>
-        {openMenu === 'connector' && (
-          <div className="absolute left-full ml-2 top-0 bg-white border border-slate-200 rounded-xl shadow-xl p-2 animate-slide-up z-50">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 px-1 pb-1.5">Connector Type</p>
-            <div className="flex gap-1">
-              <button onClick={() => { setConnectorMode('straight'); setTool('connector'); setOpenMenu(null); }} className={cn('p-2 rounded-lg flex items-center gap-2 transition-all', connectorMode === 'straight' ? 'bg-emerald-50 text-emerald-700 font-semibold shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}>
-                <StraightLineIcon size={18} /> Straight
-              </button>
-              <button onClick={() => { setConnectorMode('polyline'); setTool('connector'); setOpenMenu(null); }} className={cn('p-2 rounded-lg flex items-center gap-2 transition-all', connectorMode === 'polyline' ? 'bg-emerald-50 text-emerald-700 font-semibold shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}>
-                <FlexLineIcon size={18} /> Flexible
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Connector — straight only, no sub-menu */}
+      <button
+        onClick={() => { setConnectorMode('straight'); setTool('connector'); }}
+        title="Connector"
+        className={cn('tool-btn', tool === 'connector' && 'active')}
+      >
+        <StraightLineIcon size={16} />
+      </button>
 
       <div className="w-full h-px bg-slate-200 my-0.5" />
 

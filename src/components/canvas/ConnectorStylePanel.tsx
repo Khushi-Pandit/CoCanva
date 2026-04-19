@@ -1,155 +1,168 @@
 'use client';
+/**
+ * ConnectorStylePanel — Ultra-compact floating toolbar
+ * Appears directly above a selected connector element.
+ * Same layout pattern as FloatingTextToolbar.
+ */
 import { useCanvasStore } from '@/store/canvas.store';
 import { cn } from '@/lib/utils';
-import { X } from 'lucide-react';
+import { toAPI, calculateBounds } from '@/lib/element.transform';
+import { isConnector, Connector, ArrowHeadStyle } from '@/types/element';
 
-const ARROW_STYLES = [
-  { value: 'triangle' as const, label: 'Filled', preview: '▶' },
-  { value: 'open'     as const, label: 'Open',   preview: '>' },
-  { value: 'dot'      as const, label: 'Dot',    preview: '•' },
-  { value: 'diamond'  as const, label: 'Diamond',preview: '◆' },
-];
+// SVG icon helpers (lucide doesn't have all of these at icon-size well)
+const IconStraight = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <line x1="2" y1="8" x2="14" y2="8" />
+    <polyline points="10 5 14 8 10 11" />
+  </svg>
+);
+const IconFlex = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 12 Q5 4 8 8 Q11 12 14 4" />
+    <polyline points="11 1 14 4 11 7" />
+  </svg>
+);
+const IconArrowRight = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <line x1="2" y1="8" x2="14" y2="8" />
+    <polyline points="10 5 14 8 10 11" />
+  </svg>
+);
+const IconArrowBoth = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <line x1="2" y1="8" x2="14" y2="8" />
+    <polyline points="5 5 2 8 5 11" />
+    <polyline points="11 5 14 8 11 11" />
+  </svg>
+);
+const IconLine = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <line x1="2" y1="8" x2="14" y2="8" />
+  </svg>
+);
+const IconRounded = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 12 Q2 4 8 4 Q14 4 14 12" />
+  </svg>
+);
 
-const COLORS = [
-  '#111827', '#6b7280', '#ef4444', '#f97316', '#eab308',
-  '#22c55e', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899',
-];
+interface ConnectorStylePanelProps {
+  onModify: (el: any, apiForm: unknown) => void;
+}
 
-const HEAD_OPTIONS = [
-  { value: 'end'  as const, label: '→',  title: 'Arrow end',      desc: 'One arrow' },
-  { value: 'both' as const, label: '↔',  title: 'Bidirectional',  desc: 'Both ends' },
-  { value: 'none' as const, label: '—',  title: 'No arrow',       desc: 'Plain line' },
-];
-
-export function ConnectorStylePanel() {
+export function ConnectorStylePanel({ onModify }: ConnectorStylePanelProps) {
   const {
-    tool, connectorMode, connectorHead, connectorHeadStyle, connectorRounded,
-    color, lineWidth,
+    selectedIds, elements, viewport,
+    connectorMode, connectorHead, connectorHeadStyle, connectorRounded,
     setConnectorMode, setConnectorHead, setConnectorHeadStyle, setConnectorRounded,
-    setColor, setLineWidth, setTool,
+    updateElement,
   } = useCanvasStore();
 
-  if (tool !== 'connector') return null;
+  // Get selected connectors
+  const selectedConnectors = selectedIds
+    .map(id => elements.find(e => e.id === id))
+    .filter((e): e is Connector => !!e && isConnector(e));
+
+  if (selectedConnectors.length === 0) return null;
+
+  // Use first selected connector's values for display
+  const conn = selectedConnectors[0];
+  const curMode  = conn.mode ?? connectorMode;
+  const curHead  = conn.arrowStart && conn.arrowEnd ? 'both' : conn.arrowEnd ? 'end' : 'none';
+  const curStyle = (conn.arrowHeadStyle as Exclude<ArrowHeadStyle, 'none'>) ?? connectorHeadStyle;
+  const curRound = conn.borderRadius !== undefined ? conn.borderRadius > 0 : connectorRounded;
+
+  // Apply patch to all selected connectors
+  const apply = (patch: Partial<Connector>) => {
+    for (const c of selectedConnectors) {
+      const updated = { ...c, ...patch } as Connector;
+      updateElement(c.id, patch as any);
+      onModify(updated, toAPI(updated));
+    }
+  };
+
+  // Position above the connector bounding box (canvas → screen coords)
+  const bounds = (() => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity;
+    for (const c of selectedConnectors) {
+      if (!c.points.length) continue;
+      const b = calculateBounds(c.points);
+      if (b.minX < minX) minX = b.minX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.maxX > maxX) maxX = b.maxX;
+    }
+    return { minX, minY, maxX };
+  })();
+
+  const screenCx = ((bounds.minX + bounds.maxX) / 2) * viewport.zoom + viewport.x;
+  const screenTop = bounds.minY * viewport.zoom + viewport.y - 68; // 68px above for room to grab handles
+  const PANEL_W = 182; // estimated pill width without path buttons
+  const left = Math.max(8, screenCx - PANEL_W / 2);
+  const top = Math.max(8, screenTop);
 
   return (
     <div
-      className="absolute left-16 bottom-6 z-30 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 animate-slide-up"
-      style={{ minWidth: 260, maxWidth: 300 }}
-      onPointerDown={(e) => e.stopPropagation()}
+      className="absolute z-50 flex items-center gap-0.5 px-1.5 py-1 bg-white border border-slate-200 rounded-xl shadow-xl animate-fade-in pointer-events-auto select-none"
+      style={{ left, top }}
+      onPointerDown={e => e.stopPropagation()}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2.5">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Connector Style</p>
-        <button
-          onClick={() => setTool('select')}
-          className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
-        >
-          <X size={12} />
-        </button>
-      </div>
+      {/* DIRECTION: → ↔ — */}
+      <button
+        title="One-way →"
+        onClick={() => { setConnectorHead('end'); apply({ arrowEnd: true, arrowStart: false }); }}
+        className={cn('w-7 h-7 flex items-center justify-center rounded-lg transition-all',
+          curHead === 'end' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100')}
+      >
+        <IconArrowRight />
+      </button>
+      <button
+        title="Bidirectional ↔"
+        onClick={() => { setConnectorHead('both'); apply({ arrowEnd: true, arrowStart: true }); }}
+        className={cn('w-7 h-7 flex items-center justify-center rounded-lg transition-all',
+          curHead === 'both' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100')}
+      >
+        <IconArrowBoth />
+      </button>
+      <button
+        title="No arrow"
+        onClick={() => { setConnectorHead('none'); apply({ arrowEnd: false, arrowStart: false }); }}
+        className={cn('w-7 h-7 flex items-center justify-center rounded-lg transition-all',
+          curHead === 'none' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100')}
+      >
+        <IconLine />
+      </button>
 
-      {/* Line type: Straight vs Flexible */}
-      <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 font-semibold">Path</p>
-      <div className="grid grid-cols-2 gap-1 mb-3">
-        {[
-          { v: 'straight' as const, label: 'Straight', icon: '⟶' },
-          { v: 'polyline' as const, label: 'Flexible', icon: '⤻' },
-        ].map(({ v, label, icon }) => (
-          <button key={v} onClick={() => setConnectorMode(v)}
-            className={cn(
-              'flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition-all',
-              connectorMode === v
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
-            )}>
-            <span className="text-base leading-none">{icon}</span> {label}
+      {/* Divider */}
+      <div className="w-px h-5 bg-slate-200 mx-0.5" />
+
+      {/* ARROWHEAD STYLE — compact text glyphs */}
+      {(['triangle', 'open', 'dot', 'diamond'] as Exclude<ArrowHeadStyle, 'none'>[]).map((s) => {
+        const g = { triangle: '▶', open: '›', dot: '●', diamond: '◆' }[s];
+        return (
+          <button
+            key={s}
+            title={s}
+            onClick={() => { setConnectorHeadStyle(s); apply({ arrowHeadStyle: s, arrowTailStyle: s }); }}
+            className={cn('w-7 h-7 flex items-center justify-center rounded-lg text-sm transition-all',
+              curStyle === s ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100')}
+          >
+            {g}
           </button>
-        ))}
-      </div>
+        );
+      })}
 
-      {/* Arrowhead direction */}
-      <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 font-semibold">Direction</p>
-      <div className="grid grid-cols-3 gap-1 mb-3">
-        {HEAD_OPTIONS.map(({ value, label, title }) => (
-          <button key={value} onClick={() => setConnectorHead(value)} title={title}
-            className={cn(
-              'py-1.5 rounded-lg text-sm font-bold border transition-all',
-              connectorHead === value
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
-            )}>
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* Divider */}
+      <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
-      {/* Arrowhead style */}
-      <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 font-semibold">Arrowhead Style</p>
-      <div className="flex gap-1 flex-wrap mb-3">
-        {ARROW_STYLES.map(({ value, label, preview }) => (
-          <button key={value} onClick={() => setConnectorHeadStyle(value)} title={label}
-            className={cn(
-              'flex-1 py-1.5 px-1 rounded-lg text-center border transition-all',
-              connectorHeadStyle === value
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
-            )}>
-            <span className="text-sm block leading-none">{preview}</span>
-            <span className="text-[9px] block mt-0.5 leading-none">{label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Rounded corners toggle */}
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Rounded corners</p>
-        <button
-          onClick={() => setConnectorRounded(!connectorRounded)}
-          className={cn(
-            'w-9 h-5 rounded-full border-2 transition-all relative',
-            connectorRounded
-              ? 'bg-emerald-500 border-emerald-500'
-              : 'bg-slate-200 border-slate-300'
-          )}
-        >
-          <span className={cn(
-            'absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full shadow transition-all',
-            connectorRounded ? 'left-4' : 'left-0.5'
-          )} />
-        </button>
-      </div>
-
-      {/* Color */}
-      <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1.5 font-semibold">Color</p>
-      <div className="flex flex-wrap gap-1 mb-3">
-        {COLORS.map((c) => (
-          <button key={c} onClick={() => setColor(c)}
-            className="w-6 h-6 rounded-lg border-2 transition-all hover:scale-110"
-            style={{
-              background: c,
-              borderColor: color === c ? '#10b981' : 'transparent',
-              boxShadow: color === c ? '0 0 0 2px #10b981' : undefined,
-            }}
-          />
-        ))}
-        <input type="color" value={color} onChange={(e) => setColor(e.target.value)}
-          className="w-6 h-6 rounded cursor-pointer border border-slate-200 p-0" title="Custom color" />
-      </div>
-
-      {/* Width */}
-      <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 font-semibold">Thickness: {lineWidth}px</p>
-      <input type="range" min={1} max={12} value={lineWidth}
-        onChange={(e) => setLineWidth(Number(e.target.value))}
-        className="w-full accent-emerald-500 mb-1" />
-
-      {/* Usage hint */}
-      <p className="text-[9px] text-slate-400 mt-2 text-center">
-        Click to place start → move → click to place end
-        <br />
-        <kbd className="text-[8px] bg-slate-100 px-1 py-0.5 rounded">Esc</kbd> cancel &nbsp;
-        <kbd className="text-[8px] bg-slate-100 px-1 py-0.5 rounded">Enter</kbd> finish &nbsp;
-        <kbd className="text-[8px] bg-slate-100 px-1 py-0.5 rounded">⌫</kbd> undo last point
-      </p>
+      {/* ROUNDED CORNERS toggle */}
+      <button
+        title={curRound ? 'Sharp corners' : 'Rounded corners'}
+        onClick={() => { setConnectorRounded(!curRound); apply({ borderRadius: curRound ? 0 : 16 }); }}
+        className={cn('w-7 h-7 flex items-center justify-center rounded-lg transition-all',
+          curRound ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100')}
+      >
+        <IconRounded />
+      </button>
     </div>
   );
 }
