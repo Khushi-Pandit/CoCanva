@@ -21,6 +21,7 @@ export interface ElementBase {
   isGhostSuggestion?: boolean;
   aiConfidence?: number;
   borderRadius?: number;
+  pageIndex?: number;
   fontWeight?: 'normal' | 'bold';
   fontStyle?: 'normal' | 'italic';
   textAlign?: 'left' | 'center' | 'right';
