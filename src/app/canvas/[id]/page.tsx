@@ -436,8 +436,8 @@ export default function CanvasPage() {
       {/* Left toolbar */}
       {canEdit && <Toolbar canEdit={canEdit} onStyleChange={handleStyleChange} />}
 
-      {/* Connector style panel — slides up from bottom-left when connector tool active */}
-      {canEdit && <ConnectorStylePanel />}
+      {/* Connector style panel — shows when a connector element is selected */}
+      {canEdit && <ConnectorStylePanel onModify={handleElementModify} />}
 
       {/* Top bar */}
       <TopBar
