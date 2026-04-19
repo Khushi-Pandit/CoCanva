@@ -25,7 +25,7 @@ import { pageApi, PageMeta } from '@/lib/api/page.api';
 import { toAPI, generateId, fromAPI } from '@/lib/element.transform';
 import { DrawableElement, isStroke, isShape, isFlowchart, isTextElement, isConnector } from '@/types/element';
 import { PAGE_DIMENSIONS, PageSize } from '@/types/canvas';
-import { thumbnailApi } from '@/lib/api/ai.api';
+import { thumbnailApi, aiApi } from '@/lib/api/ai.api';
 
 import { CanvasEngine } from '@/components/canvas/CanvasEngine';
 import { Toolbar } from '@/components/canvas/Toolbar';
@@ -40,7 +40,10 @@ import { ConnectorStylePanel } from '@/components/canvas/ConnectorStylePanel';
 import { ToastContainer } from '@/components/ui/Toast';
 import { PageNavigator } from '@/components/notes/PageNavigator';
 import { useNotesStore } from '@/store/notes.store';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, Mic, MicOff, Sparkles } from 'lucide-react';
+import { useTranscription } from '@/lib/socket/useTranscription';
+import { generateNotesSVG, renderSVGToPNG } from '@/lib/notes.export';
+import { NotesSummaryModal } from '@/components/notes/NotesSummaryModal';
 
 export default function NotesPage() {
   const params       = useParams();
@@ -58,6 +61,24 @@ export default function NotesPage() {
   } = useCanvasStore();
   const { addToast } = useUIStore();
 
+  const socketRef = useRef<any>(null);
+  const firebaseUserRef = useRef<any>(null);
+  
+  useEffect(() => { firebaseUserRef.current = firebaseUser; }, [firebaseUser]);
+
+  const { isTranscribing, startTranscription, stopTranscription, error: transcriptionError } = useTranscription({
+    onChunk: (text) => {
+      if (socketRef.current) {
+        socketRef.current.emit('voice:transcript_chunk', {
+          canvasId,
+          pageIndex: currentPageIdxRef.current,
+          transcript: text,
+          userName: firebaseUserRef.current?.displayName || 'User'
+        });
+      }
+    }
+  });
+
   const [token,         setToken]        = useState('');
   const [joinLoading,   setJoinLoading]  = useState(true);
   const [joiningVoice,  setJoiningVoice] = useState(false);
@@ -66,6 +87,8 @@ export default function NotesPage() {
 
   const [pageSize,    setPageSizeState] = useState<PageSize>('a4');
   const [orientation, setOrientation]   = useState<'portrait' | 'landscape'>('portrait');
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
   const notesStore = useNotesStore();
   const { pages, currentPageIndex } = notesStore;
@@ -84,6 +107,10 @@ export default function NotesPage() {
   useEffect(() => {
     if (!authLoading && !firebaseUser) router.replace('/login');
   }, [authLoading, firebaseUser, router]);
+
+  useEffect(() => {
+    if (transcriptionError) addToast(transcriptionError, 'error');
+  }, [transcriptionError, addToast]);
 
   // ── Load elements for a specific page (REST fallback) ──────────────────────
   const loadPageElements = useCallback(async (pageIdx: number) => {
@@ -184,6 +211,20 @@ export default function NotesPage() {
     socket, canvasId, mySocketId,
   });
   const handleJoinVoice = async () => { setJoiningVoice(true); await joinVoice(); setJoiningVoice(false); };
+
+  // ★ Auto-transcribe when joining voice room
+  useEffect(() => {
+    if (inVoice) {
+      startTranscription();
+    } else {
+      stopTranscription();
+    }
+  }, [inVoice, startTranscription, stopTranscription]);
+
+  // Keep socketRef updated for the transcription callback
+  useEffect(() => {
+    socketRef.current = socket;
+  }, [socket]);
 
   // ── Save (always tags current pageIndex on elements) ───────────────────────
   const handleSave = useCallback(async (silent = false) => {
@@ -328,6 +369,33 @@ export default function NotesPage() {
     }
   }, [canvasId, shareToken, pages, pageW, pageH, handleSave, notesStore.pageSummaries, addToast]);
 
+  // ── Multimodal Summarization ───────────────────────────────────────────────
+  const handleSummarizePage = useCallback(async () => {
+    setSummaryModalOpen(true);
+    setIsGeneratingSummary(true);
+    try {
+      await handleSave(true); // ensure current strokes are committed
+      const pageIdx = currentPageIdxRef.current;
+      
+      // Get all elements for this specific page
+      const pageEls = useCanvasStore.getState().elements.filter((e: any) => (e.pageIndex ?? 0) === pageIdx);
+      
+      // 1. Generate SVG -> PNG
+      const svgStr = generateNotesSVG(pageEls, pageW, pageH);
+      const pngData = await renderSVGToPNG(svgStr, pageW, pageH, 1.5);
+      
+      if (!pngData) throw new Error('Failed to capture page image');
+
+      // 2. Send to AI
+      const res = await aiApi.summarizeNotesPage(canvasId, pngData, pageIdx);
+      notesStore.setPageSummary(pageIdx, res.summary);
+    } catch (e: any) {
+      addToast(e.message || 'Summarization failed', 'error');
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  }, [canvasId, pageW, pageH, notesStore, handleSave, addToast]);
+
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   const clipboardRef = useRef<DrawableElement[]>([]);
   useEffect(() => {
@@ -465,17 +533,26 @@ export default function NotesPage() {
           {navOpen ? <PanelLeftClose size={13} /> : <PanelLeftOpen size={13} />}
         </button>
 
-        {/* Voice room */}
-        <div className="absolute top-14 right-4 z-20">
+        {/* Voice room & Transcription */}
+        <div className="absolute top-14 right-4 z-20 flex flex-col gap-2 items-end">
           <VoiceRoom
             inVoice={inVoice} muted={muted} participants={participants}
             permissionDenied={permissionDenied} joining={joiningVoice}
             onJoin={handleJoinVoice} onLeave={leaveVoice} onToggleMute={toggleMute}
           />
+          <div className="flex gap-2">
+            <button
+              onClick={handleSummarizePage}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full shadow-md text-xs font-bold transition-all bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300"
+              title="Generate AI Summary for this page"
+            >
+              <Sparkles size={14} /> Summarize
+            </button>
+          </div>
         </div>
 
         {/* AI Chat Panel */}
-        <AIChatPanel canvasId={canvasId} onGhostElementsGenerated={canEdit ? handleGhostElementsGenerated : undefined} />
+        <AIChatPanel canvasId={canvasId} onGhostElementsGenerated={canEdit ? handleGhostElementsGenerated : undefined} mode="notes" />
 
         {/* Ghost Accept Bar */}
         {ghostElements.length > 0 && (
@@ -485,6 +562,15 @@ export default function NotesPage() {
         {/* Comments & Branch panels */}
         <AnnotationsPanel />
         <BranchHistoryPanel />
+
+        {/* AI Summary Modal */}
+        <NotesSummaryModal 
+          isOpen={summaryModalOpen}
+          onClose={() => setSummaryModalOpen(false)}
+          isGenerating={isGeneratingSummary}
+          summary={notesStore.pageSummaries[currentPageIndex] || ''}
+          pageTitle={pages.find(p => p.pageIndex === currentPageIndex)?.label || `Page ${currentPageIndex + 1}`}
+        />
 
         {/* ── Page navigation footer ── */}
         <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 pointer-events-auto">

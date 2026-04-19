@@ -7,10 +7,12 @@ import {
 import { useUIStore } from '@/store/ui.store';
 import { useAuthStore } from '@/store/auth.store';
 import { useCanvasStore } from '@/store/canvas.store';
+import { useNotesStore } from '@/store/notes.store';
 import { aiApi } from '@/lib/api/ai.api';
 import { fromAPI, toAPI } from '@/lib/element.transform';
 import { cn } from '@/lib/utils';
 import type { DrawableElement } from '@/types/element';
+import ReactMarkdown from 'react-markdown';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Message {
@@ -53,10 +55,11 @@ const BADGE_MAP: Record<string, ModelMeta> = {
 interface AIChatPanelProps {
   canvasId: string;
   onGhostElementsGenerated?: (elements: DrawableElement[]) => void;
+  mode?: 'canvas' | 'notes';
 }
 
 // ── Quick prompts ─────────────────────────────────────────────────────────────
-const QUICK_PROMPTS = [
+const CANVAS_PROMPTS = [
   { icon: '🔐', text: 'Draw a user authentication flow' },
   { icon: '🏗️', text: 'Create a microservices architecture diagram' },
   { icon: '📋', text: 'Generate a 5-step onboarding process' },
@@ -65,8 +68,15 @@ const QUICK_PROMPTS = [
   { icon: '📝', text: 'Explain the selected element' },
 ];
 
+const NOTES_PROMPTS = [
+  { icon: '✨', text: 'Summarize the current page' },
+  { icon: '🗣️', text: 'What did the speaker say about the last topic?' },
+  { icon: '🤔', text: 'Explain the handwritten diagram on this page' },
+  { icon: '📝', text: 'Generate a study guide from all notes' },
+];
+
 // ── Main Component ─────────────────────────────────────────────────────────────
-export function AIChatPanel({ canvasId, onGhostElementsGenerated }: AIChatPanelProps) {
+export function AIChatPanel({ canvasId, onGhostElementsGenerated, mode = 'canvas' }: AIChatPanelProps) {
   const { aiChatOpen, setPanel } = useUIStore();
   const { getToken } = useAuthStore();
   const { elements, selectedIds } = useCanvasStore();
@@ -115,8 +125,17 @@ export function AIChatPanel({ canvasId, onGhostElementsGenerated }: AIChatPanelP
       await getToken();
 
       // Serialize current canvas elements for the AI to see
-      const serializedElements = elements.map(toAPI);
+      let serializedElements = elements.map(toAPI);
       const history = messages.slice(-8).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+      let pageIndex = 0;
+      if (mode === 'notes') {
+        const notesStore = useNotesStore.getState();
+        pageIndex = notesStore.currentPageIndex;
+        
+        // Filter elements to only current page to reduce tokens
+        serializedElements = serializedElements.filter((e: any) => (e.pageIndex ?? 0) === pageIndex);
+      }
 
       const result = await aiApi.agentChat(
         canvasId,
@@ -125,6 +144,8 @@ export function AIChatPanel({ canvasId, onGhostElementsGenerated }: AIChatPanelP
         serializedElements,
         selectedIds,
         selectedModel,
+        mode,
+        pageIndex
       );
 
       // Process actions
@@ -299,7 +320,7 @@ export function AIChatPanel({ canvasId, onGhostElementsGenerated }: AIChatPanelP
               </p>
             </div>
             <div className="flex flex-col gap-1.5 w-full px-1 mt-1">
-              {QUICK_PROMPTS.map(p => (
+              {(mode === 'notes' ? NOTES_PROMPTS : CANVAS_PROMPTS).map(p => (
                 <button
                   key={p.text}
                   onClick={() => sendMessage(p.text)}
@@ -325,14 +346,18 @@ export function AIChatPanel({ canvasId, onGhostElementsGenerated }: AIChatPanelP
               </div>
               <div className="flex flex-col gap-1.5 max-w-[85%]">
                 <div className={cn(
-                  'px-3 py-2 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap',
+                  'px-3 py-2 rounded-2xl text-xs leading-relaxed',
                   msg.role === 'assistant'
                     ? msg.isError
                       ? 'bg-red-50 border border-red-100 text-red-700 rounded-tl-sm'
-                      : 'bg-slate-50 border border-slate-100 text-slate-700 rounded-tl-sm'
-                    : 'bg-emerald-500 text-white rounded-tr-sm',
+                      : 'bg-slate-50 border border-slate-100 text-slate-700 rounded-tl-sm prose prose-sm prose-slate max-w-none'
+                    : 'bg-emerald-500 text-white rounded-tr-sm whitespace-pre-wrap',
                 )}>
-                  {msg.content}
+                  {msg.role === 'assistant' && !msg.isError ? (
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  ) : (
+                    msg.content
+                  )}
                 </div>
 
                 {/* Action summaries */}

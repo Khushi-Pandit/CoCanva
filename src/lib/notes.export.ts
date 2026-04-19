@@ -24,6 +24,20 @@ export interface NotesExportOptions {
   saveCurrentPage: () => Promise<void>;
 }
 
+function escapeXML(str: string): string {
+  if (!str) return '';
+  return str.replace(/[<>&'"]/g, c => {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case '\'': return '&apos;';
+      case '"': return '&quot;';
+      default: return c;
+    }
+  });
+}
+
 // ── SVG Generation (Fixed Page Bounds) ───────────────────────────────────────
 
 function markerShape(style: string, color: string) {
@@ -39,7 +53,7 @@ function markerShape(style: string, color: string) {
   }
 }
 
-function generateNotesSVG(elements: DrawableElement[], pageW: number, pageH: number): string {
+export function generateNotesSVG(elements: DrawableElement[], pageW: number, pageH: number): string {
   const paths = elements.map((el) => {
     if (el.kind === 'stroke') {
       const d = el.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
@@ -72,7 +86,7 @@ function generateNotesSVG(elements: DrawableElement[], pageW: number, pageH: num
       }
     }
     if (el.kind === 'text') {
-      return `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" font-family="${el.fontFamily}" fill="${el.color}">${el.text}</text>`;
+      return `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" font-family="${el.fontFamily}" fill="${el.color}">${escapeXML(el.text || '')}</text>`;
     }
     if (el.kind === 'flowchart') {
       const x = el.x, y = el.y, w = el.width, h = el.height;
@@ -83,7 +97,7 @@ function generateNotesSVG(elements: DrawableElement[], pageW: number, pageH: num
       } else if (el.shapeType === 'diamond') {
         shapeStr = `<polygon points="${x + w/2},${y} ${x + w},${y + h/2} ${x + w/2},${y + h} ${x},${y + h/2}" stroke="${el.color}" stroke-width="${el.strokeWidth}" fill="${bg}" opacity="${el.opacity}" />`;
       }
-      const txt = `<text x="${x + w/2}" y="${y + h/2}" font-size="${el.fontSize}" font-family="${el.fontFamily}" fill="${el.color}" text-anchor="middle" dominant-baseline="central">${el.label || ''}</text>`;
+      const txt = `<text x="${x + w/2}" y="${y + h/2}" font-size="${el.fontSize}" font-family="${el.fontFamily}" fill="${el.color}" text-anchor="middle" dominant-baseline="central">${escapeXML(el.label || '')}</text>`;
       return `${shapeStr}\n${txt}`;
     }
     return '';
@@ -99,7 +113,7 @@ function generateNotesSVG(elements: DrawableElement[], pageW: number, pageH: num
 
 // ── SVG to PNG Conversion (High DPI) ─────────────────────────────────────────
 
-async function renderSVGToPNG(svgStr: string, pageW: number, pageH: number, dpr = 2): Promise<string> {
+export async function renderSVGToPNG(svgStr: string, pageW: number, pageH: number, dpr = 2): Promise<string> {
   return new Promise((resolve, reject) => {
     const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);

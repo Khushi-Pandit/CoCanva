@@ -17,10 +17,12 @@ export const aiApi = {
     elements: unknown[],
     selectedElementIds: string[],
     model = 'auto',
+    contextType: 'canvas' | 'notes' = 'canvas',
+    pageIndex = 0,
   ) =>
     post<{ message: string; actions: unknown[]; modelUsed: string }>(
       `/canvases/${canvasId}/ai/agent`,
-      { message, history, elements, selectedElementIds, model },
+      { message, history, elements, selectedElementIds, model, contextType, pageIndex },
     ),
 
   /** POST /canvases/:id/ai/explain — explain a single element */
@@ -48,6 +50,10 @@ export const aiApi = {
   /** POST /canvases/:id/ai/summarize */
   summarize: (canvasId: string) =>
     post<{ summary: string }>(`/canvases/${canvasId}/ai/summarize`),
+
+  /** POST /canvases/:id/ai/summarize-notes-page */
+  summarizeNotesPage: (canvasId: string, imageData: string, pageIndex: number) =>
+    post<{ summary: string }>(`/canvases/${canvasId}/ai/summarize-notes-page`, { imageData, pageIndex }),
 
   /** POST /canvases/:id/ai/layout */
   autoLayout: (canvasId: string, algorithm?: string, elementIds?: string[]) =>
