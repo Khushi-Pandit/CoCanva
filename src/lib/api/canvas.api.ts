@@ -50,6 +50,9 @@ export const canvasApi = {
     isPublic?: boolean;
     category?: 'flowchart' | 'architecture' | 'brainstorm' | 'wireframe' | 'erd' | 'other';
     templateId?: string;
+    canvasType?: 'drawing' | 'notes' | 'diagram';
+    pageSize?: 'a4' | 'letter' | 'a3' | 'a5' | 'custom';
+    pageOrientation?: 'portrait' | 'landscape';
   }) => post<CanvasResponse>('/canvases', body),
 
   /** GET /canvases/:id */

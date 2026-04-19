@@ -12,6 +12,8 @@ export function fromAPI(raw: any): DrawableElement | null {
     if (!raw) return null;
     const id = raw.elementId || raw.id;
     if (!id) return null;
+    // pageIndex is preserved on every element for Notes page isolation
+    const pageIndex: number = raw.pageIndex ?? 0;
 
     if (raw.type === 'stroke' || raw.kind === 'stroke') {
       return {
@@ -23,6 +25,7 @@ export function fromAPI(raw: any): DrawableElement | null {
         opacity: raw.opacity ?? 1,
         timestamp: raw.timestamp ?? Date.now(),
         createdBy: raw.createdBy,
+        pageIndex,
         bounds: raw.x !== undefined ? { minX: raw.x, minY: raw.y, maxX: raw.x + (raw.width ?? 0), maxY: raw.y + (raw.height ?? 0) } : undefined,
       } as Stroke;
     }
@@ -49,6 +52,7 @@ export function fromAPI(raw: any): DrawableElement | null {
         arrowHeadStyle: raw.arrowHeadStyle ?? 'triangle',
         arrowTailStyle: raw.arrowTailStyle ?? (raw.arrowStart ? 'triangle' : 'none'),
         timestamp: raw.timestamp ?? Date.now(), createdBy: raw.createdBy,
+        pageIndex,
         fromId: raw.fromElementId ?? raw.fromId,
         toId: raw.toElementId ?? raw.toId,
       } as Connector;
@@ -59,17 +63,16 @@ export function fromAPI(raw: any): DrawableElement | null {
       if (isFC) {
         return {
           id, elementId: id, kind: 'flowchart',
-          // Priority: shapeType field first (most explicit), then subtype, fallback to rectangle
           shapeType: (raw.shapeType ?? raw.subtype ?? 'rectangle') as FlowchartShapeType,
           x: raw.x ?? 0, y: raw.y ?? 0, width: raw.width ?? 100, height: raw.height ?? 60,
           label: raw.label ?? '', color: raw.strokeColor ?? raw.color ?? '#2563eb',
           fillColor: raw.fillColor ?? '#dbeafe', strokeWidth: raw.strokeWidth ?? 2,
           opacity: raw.opacity ?? 1, rotation: raw.rotation ?? 0,
           fontSize: raw.fontSize ?? 13, fontFamily: raw.fontFamily ?? 'Inter, sans-serif',
+          pageIndex,
           timestamp: raw.timestamp ?? Date.now(), createdBy: raw.createdBy,
         } as FlowchartElement;
       }
-      // === CRITICAL FIX: read shape type from multiple fields, priority: shapeType > subtype > fallback ===
       const shapeType = (raw.metadata?.shapeType ?? raw.customData?.shapeType ?? raw.shapeType ?? raw.subtype ?? 'rectangle') as ShapeType;
       return {
         id, elementId: id, kind: 'shape',
@@ -78,8 +81,8 @@ export function fromAPI(raw: any): DrawableElement | null {
         color: raw.strokeColor ?? raw.color ?? '#2563eb',
         fillColor: raw.fillColor, strokeWidth: raw.strokeWidth ?? 2,
         opacity: raw.opacity ?? 1, rotation: raw.rotation ?? 0,
-        // === FIX: deserialize borderRadius ===
         borderRadius: raw.metadata?.borderRadius ?? raw.customData?.borderRadius ?? raw.borderRadius ?? raw.roundness ?? undefined,
+        pageIndex,
         timestamp: raw.timestamp ?? Date.now(), createdBy: raw.createdBy,
       } as Shape;
     }
@@ -96,6 +99,7 @@ export function fromAPI(raw: any): DrawableElement | null {
         textAlign: (raw.textAlign ?? 'left') as 'left' | 'center' | 'right',
         opacity: raw.opacity ?? 1,
         rotation: raw.rotation ?? 0,
+        pageIndex,
         timestamp: raw.timestamp ?? Date.now(), createdBy: raw.createdBy,
       } as TextElement;
     }
@@ -106,7 +110,9 @@ export function fromAPI(raw: any): DrawableElement | null {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toAPI(el: DrawableElement): any {
-  const base = { elementId: el.id, createdBy: el.createdBy };
+  // pageIndex is preserved so Notes mode can isolate elements per page
+  const pageIndex: number = (el as any).pageIndex ?? 0;
+  const base = { elementId: el.id, createdBy: el.createdBy, pageIndex };
 
   if (el.kind === 'stroke') {
     const pts = el.points;
@@ -123,7 +129,6 @@ export function toAPI(el: DrawableElement): any {
     if (el.shapeType === 'connector') {
       return { ...base, type: 'connector', subtype: 'straight', x: el.x, y: el.y, width: el.width, height: el.height ?? 0, rotation: el.rotation ?? 0, strokeColor: el.color, fillColor: el.fillColor, strokeWidth: el.strokeWidth, opacity: el.opacity, fromElementId: el.fromId, toElementId: el.toId, points: el.points, dashed: el.dashed, arrowEnd: el.arrowEnd, label: el.label };
     }
-    // === FIX: send both subtype AND shapeType for redundancy ===
     return { ...base, type: 'shape', subtype: el.shapeType, shapeType: el.shapeType, x: el.x, y: el.y, width: el.width, height: el.height, rotation: el.rotation ?? 0, label: el.label ?? '', strokeColor: el.color, fillColor: el.fillColor, strokeWidth: el.strokeWidth, opacity: el.opacity, fontSize: el.fontSize, fontFamily: el.fontFamily, isFlowchartEl: true };
   }
 
@@ -135,26 +140,18 @@ export function toAPI(el: DrawableElement): any {
       if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
     }
     if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 0; maxY = 0; }
-
     return {
       ...base,
       type: 'connector',
       subtype: el.mode ?? (el.points.length === 2 ? 'straight' : 'polyline'),
-      x: minX,
-      y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
+      x: minX, y: minY, width: maxX - minX, height: maxY - minY,
       fromPoint: el.points[0],
       toPoint: el.points[el.points.length - 1],
       points: el.points,
-      strokeColor: el.color,
-      strokeWidth: el.width,
-      opacity: el.opacity,
+      strokeColor: el.color, strokeWidth: el.width, opacity: el.opacity,
       dashed: el.dashed ?? false,
-      fromElementId: el.fromId,
-      toElementId: el.toId,
-      arrowStart: el.arrowStart ?? false,
-      arrowEnd: el.arrowEnd ?? true,
+      fromElementId: el.fromId, toElementId: el.toId,
+      arrowStart: el.arrowStart ?? false, arrowEnd: el.arrowEnd ?? true,
       arrowHeadStyle: el.arrowHeadStyle ?? 'triangle',
       arrowTailStyle: el.arrowTailStyle ?? ((el.arrowStart ?? false) ? 'triangle' : 'none'),
       roundness: el.borderRadius ?? 12,
@@ -162,23 +159,17 @@ export function toAPI(el: DrawableElement): any {
   }
 
   if (el.kind === 'shape') {
-    // === CRITICAL FIX: send shapeType as BOTH subtype AND shapeType field ===
-    // This ensures the backend always has the correct shape type regardless of which field it reads
     return {
       ...base,
       type: 'shape',
-      subtype: el.type,         // primary field backend may use
-      shapeType: el.type,       // redundant explicit field for safety
-      metadata: { shapeType: el.type, borderRadius: el.borderRadius }, // fallback object 1
-      customData: { shapeType: el.type, borderRadius: el.borderRadius }, // fallback object 2
-      x: el.x, y: el.y,
-      width: el.width, height: el.height,
+      subtype: el.type,
+      shapeType: el.type,
+      metadata: { shapeType: el.type, borderRadius: el.borderRadius },
+      customData: { shapeType: el.type, borderRadius: el.borderRadius },
+      x: el.x, y: el.y, width: el.width, height: el.height,
       rotation: el.rotation ?? 0,
-      strokeColor: el.color,
-      fillColor: el.fillColor,
-      strokeWidth: el.strokeWidth,
+      strokeColor: el.color, fillColor: el.fillColor, strokeWidth: el.strokeWidth,
       opacity: el.opacity,
-      // === FIX: always persist borderRadius ===
       borderRadius: el.borderRadius ?? undefined,
     };
   }
@@ -186,17 +177,13 @@ export function toAPI(el: DrawableElement): any {
   if (el.kind === 'text') {
     return {
       ...base, type: 'text',
-      x: el.x, y: el.y,
-      width: 200, height: el.fontSize * 2,
-      text: el.text,
-      fontSize: el.fontSize,
-      fontFamily: el.fontFamily,
+      x: el.x, y: el.y, width: 200, height: el.fontSize * 2,
+      text: el.text, fontSize: el.fontSize, fontFamily: el.fontFamily,
       textColor: el.color,
       fontWeight: el.fontWeight ?? 'normal',
       fontStyle: el.fontStyle ?? 'normal',
       textAlign: el.textAlign ?? 'left',
-      opacity: el.opacity ?? 1,
-      rotation: el.rotation ?? 0,
+      opacity: el.opacity ?? 1, rotation: el.rotation ?? 0,
     };
   }
 

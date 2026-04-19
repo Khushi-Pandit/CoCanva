@@ -13,9 +13,11 @@ interface UseCollaborationOptions {
   token: string;
   shareToken?: string;
   onCanvasJoined?: (data: { role: string; lastViewport?: { x: number; y: number; zoom: number } }) => void;
+  /** Optional override for canvas:state event — lets consumers (e.g. Notes page) filter elements by pageIndex */
+  onCanvasState?: (elements: DrawableElement[]) => void;
 }
 
-export function useCollaboration({ canvasId, token, shareToken, onCanvasJoined }: UseCollaborationOptions) {
+export function useCollaboration({ canvasId, token, shareToken, onCanvasJoined, onCanvasState: onCanvasStateOverride }: UseCollaborationOptions) {
   const socketRef  = useRef<Socket | null>(null);
   const mySocketId = useRef<string>('');
 
@@ -58,10 +60,14 @@ export function useCollaboration({ canvasId, token, shareToken, onCanvasJoined }
     // payload: { elements, canvasId, snapshotSeq }
     const onCanvasState = (data: { elements: unknown[] }) => {
       const els = (data.elements ?? []).map(fromAPI).filter((e): e is DrawableElement => e !== null);
-      // RACE CONDITION FIX: mark that socket has delivered elements BEFORE setting them.
-      // This ensures init() (which may fire after) won't wipe these elements.
       setSocketElementsLoaded(true);
-      setElements(els);
+      if (onCanvasStateOverride) {
+        // Notes page: consumer handles filtering by pageIndex
+        onCanvasStateOverride(els);
+      } else {
+        // Drawing canvas: load all elements as-is
+        setElements(els);
+      }
     };
 
     // ── users:active — peer list at join time ───────────────────────────────
