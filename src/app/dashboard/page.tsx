@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { useAuthStore } from '@/store/auth.store';
 import { useUIStore } from '@/store/ui.store';
 import { canvasApi } from '@/lib/api/canvas.api';
-import { Canvas } from '@/types/canvas';
+import { Canvas, CanvasType } from '@/types/canvas';
 import { CanvasCard } from '@/components/dashboard/CanvasCard';
+import { NewCanvasModal } from '@/components/dashboard/NewCanvasModal';
 import { ToastContainer } from '@/components/ui/Toast';
 import {
   Plus, Search, LayoutGrid, List, Bell, Settings, LogOut,
   Star, Users, Clock, Trash2, Sparkles, ChevronRight, Loader2,
-  MoreVertical, Pencil, Copy, Lock, Globe,
+  MoreVertical, Pencil, Copy, Lock, Globe, FileText, Workflow,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -27,11 +28,61 @@ function ListRow({ canvas, onRename, onDelete, onDuplicate }: {
   onDuplicate: (id: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitleValue, setEditTitleValue] = useState(canvas.title);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const canvasHref = (c: Canvas) => c.canvasType === 'notes' ? `/notes/${c._id}` : `/canvas/${c._id}`;
+  const canvasTypeBadge = (c: Canvas) => {
+    if (c.canvasType === 'notes') return { label: 'Notes', color: 'bg-amber-50 text-amber-600 border-amber-200' };
+    if (c.canvasType === 'diagram') return { label: 'Diagram', color: 'bg-blue-50 text-blue-600 border-blue-200' };
+    return { label: 'Drawing', color: 'bg-violet-50 text-violet-600 border-violet-200' };
+  };
+  const badge = canvasTypeBadge(canvas);
+
+  const handleRenameSubmit = () => {
+    setIsEditingTitle(false);
+    const newTitle = editTitleValue.trim();
+    if (newTitle && newTitle !== canvas.title) {
+      onRename(canvas._id, newTitle);
+    } else {
+      setEditTitleValue(canvas.title);
+    }
+  };
 
   return (
-    <div className="relative group flex items-center gap-3 px-3 py-2.5 bg-white border border-slate-200 rounded-xl hover:shadow-sm hover:border-slate-300 transition-all">
+    <div className="relative group flex items-center gap-3 px-3 py-2.5 bg-white border border-slate-200 rounded-xl hover:shadow-sm hover:border-slate-300 transition-all overflow-hidden">
+      {/* Delete Confirmation Overlay */}
+      {showDeleteConfirm && (
+        <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-between px-6 animate-in slide-in-from-right-8 fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+              <Trash2 className="text-red-600" size={16} />
+            </div>
+            <div>
+              <h3 className="text-[13px] font-bold text-slate-800">Delete "{canvas.title}"?</h3>
+              <p className="text-[11px] text-slate-500">This action cannot be undone.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowDeleteConfirm(false); }}
+              className="px-4 py-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowDeleteConfirm(false); onDelete(canvas._id); }}
+              className="px-4 py-1.5 text-[11px] font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors shadow-sm shadow-red-500/20"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Thumbnail */}
-      <Link href={`/canvas/${canvas._id}`} className="flex-shrink-0 w-12 h-9 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+      <Link href={canvasHref(canvas)} className="flex-shrink-0 w-12 h-9 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
         {canvas.thumbnail ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={canvas.thumbnail} alt={canvas.title} className="w-full h-full object-cover" />
@@ -44,10 +95,41 @@ function ListRow({ canvas, onRename, onDelete, onDuplicate }: {
       </Link>
 
       {/* Info */}
-      <Link href={`/canvas/${canvas._id}`} className="flex-1 min-w-0">
-        <p className="text-[13px] font-semibold text-slate-800 truncate">{canvas.title}</p>
-        <p className="text-[11px] text-slate-400">{timeAgo(canvas.updatedAt)}</p>
-      </Link>
+      <div className="flex-1 min-w-0">
+        {isEditingTitle ? (
+          <input
+            autoFocus
+            value={editTitleValue}
+            onChange={(e) => setEditTitleValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRenameSubmit();
+              else if (e.key === 'Escape') { setIsEditingTitle(false); setEditTitleValue(canvas.title); }
+            }}
+            onBlur={handleRenameSubmit}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full text-[13px] font-semibold text-slate-800 bg-white border-b-2 border-amber-400 outline-none px-0.5 py-0 shadow-sm transition-all focus:border-amber-500"
+          />
+        ) : (
+          <Link href={canvasHref(canvas)} className="block">
+            <p 
+              className="text-[13px] font-semibold text-slate-800 truncate group-hover:text-amber-700 transition-colors cursor-text"
+              onDoubleClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setEditTitleValue(canvas.title);
+                setIsEditingTitle(true);
+              }}
+              title="Double-click to rename"
+            >
+              {canvas.title}
+            </p>
+          </Link>
+        )}
+        <Link href={canvasHref(canvas)} className="flex items-center gap-2 mt-0.5">
+          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${badge.color}`}>{badge.label}</span>
+          <p className="text-[11px] text-slate-400">{timeAgo(canvas.updatedAt)}</p>
+        </Link>
+      </div>
 
       {/* Role + visibility */}
       <div className="flex items-center gap-2 flex-shrink-0">
@@ -60,30 +142,53 @@ function ListRow({ canvas, onRename, onDelete, onDuplicate }: {
       {/* Three-dot menu */}
       <div className="relative flex-shrink-0">
         <button
-          onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen((v) => !v); }}
           className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-all"
         >
           <MoreVertical size={14} />
         </button>
         {menuOpen && (
-          <div
-            className="absolute right-0 bottom-full mb-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 min-w-[150px] z-50 animate-slide-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {[
-              { label: 'Open', icon: ChevronRight, action: () => { window.location.href = `/canvas/${canvas._id}`; } },
-              { label: 'Rename', icon: Pencil, action: () => { const t = prompt('New title:', canvas.title); if (t) onRename(canvas._id, t); } },
-              { label: 'Duplicate', icon: Copy, action: () => onDuplicate(canvas._id) },
-              { label: 'Delete', icon: Trash2, action: () => { if (confirm('Delete this canvas?')) onDelete(canvas._id); }, danger: true },
-            ].map(({ label, icon: Icon, action, danger }) => (
-              <button key={label} onClick={() => { action(); setMenuOpen(false); }}
-                className={`flex items-center gap-2.5 w-full px-3 py-1.5 text-xs font-medium transition-all hover:bg-slate-50 ${
-                  danger ? 'text-red-500' : 'text-slate-600'
-                }`}>
-                <Icon size={12} /> {label}
-              </button>
-            ))}
-          </div>
+          <>
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); }} 
+            />
+            <div
+              className="absolute right-0 bottom-full mb-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 min-w-[150px] z-50 animate-in slide-in-from-bottom-2 fade-in duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {[
+                { label: 'Open', icon: ChevronRight, action: () => { window.location.href = canvasHref(canvas); } },
+                { 
+                  label: 'Rename', 
+                  icon: Pencil, 
+                  action: () => { 
+                    setMenuOpen(false); 
+                    setEditTitleValue(canvas.title);
+                    setIsEditingTitle(true); 
+                  } 
+                },
+                { 
+                  label: 'Duplicate', 
+                  icon: Copy, 
+                  action: () => { setMenuOpen(false); onDuplicate(canvas._id); } 
+                },
+                { 
+                  label: 'Delete', 
+                  icon: Trash2, 
+                  action: () => { setMenuOpen(false); setShowDeleteConfirm(true); }, 
+                  danger: true 
+                },
+              ].map(({ label, icon: Icon, action, danger }) => (
+                <button key={label} onClick={(e) => { e.preventDefault(); e.stopPropagation(); action(); }}
+                  className={`flex items-center gap-2.5 w-full px-3 py-1.5 text-xs font-medium transition-all hover:bg-slate-50 ${
+                    danger ? 'text-red-500 hover:bg-red-50' : 'text-slate-600 hover:text-slate-900'
+                  }`}>
+                  <Icon size={12} /> {label}
+                </button>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -101,6 +206,7 @@ export default function DashboardPage() {
   const [search, setSearch]       = useState('');
   const [viewMode, setViewMode]   = useState<'grid' | 'list'>('grid');
   const [creating, setCreating]   = useState(false);
+  const [showNewModal, setShowNewModal] = useState(false);
 
   // ── Guard ────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -132,11 +238,21 @@ export default function DashboardPage() {
   useEffect(() => { if (firebaseUser) load(); }, [firebaseUser, load]);
 
   // ── Actions ───────────────────────────────────────────────────────────────────
-  const createCanvas = async () => {
+  const createCanvas = async (params: { title: string; canvasType: CanvasType; pageSize?: any; pageOrientation?: any }) => {
     setCreating(true);
+    setShowNewModal(false);
     try {
-      const { canvas } = await canvasApi.create({ title: 'Untitled Canvas' });
-      router.push(`/canvas/${canvas._id}`);
+      const { canvas } = await canvasApi.create({
+        title: params.title,
+        canvasType: params.canvasType,
+        pageSize: params.pageSize,
+        pageOrientation: params.pageOrientation,
+      });
+      if (params.canvasType === 'notes') {
+        router.push(`/notes/${canvas._id}`);
+      } else {
+        router.push(`/canvas/${canvas._id}`);
+      }
     } catch {
       addToast('Failed to create canvas', 'error');
       setCreating(false);
@@ -285,12 +401,12 @@ export default function DashboardPage() {
           </div>
 
           <button
-            onClick={createCanvas}
+            onClick={() => setShowNewModal(true)}
             disabled={creating}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-all shadow-sm shadow-emerald-200 active:scale-[0.97]"
           >
             {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            New Canvas
+            New workspace
           </button>
         </div>
 
@@ -371,6 +487,12 @@ export default function DashboardPage() {
       </main>
 
       <ToastContainer />
+      {showNewModal && (
+        <NewCanvasModal
+          onClose={() => setShowNewModal(false)}
+          onCreate={createCanvas}
+        />
+      )}
     </div>
   );
 }
