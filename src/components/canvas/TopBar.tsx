@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import {
-  Undo2, Redo2, ZoomIn, ZoomOut, Grid3X3, Save, Download,
+  Undo2, Redo2, ZoomIn, ZoomOut, Grid3X3, Download,
   Share2, GitBranch, MessageSquare, Users, Wifi, WifiOff,
   ChevronRight, Settings, Loader2, Home, Image, FileCode, FileText, FileJson,
 } from 'lucide-react';
@@ -160,18 +160,6 @@ export function TopBar({ onUndo, onRedo, onSave, onExport, canUndo, canRedo, can
 
       <span className="text-slate-300">|</span>
 
-      {/* Save */}
-      {canEdit && (
-        <button
-          onClick={onSave}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-all shadow-sm shadow-emerald-200 active:scale-95"
-          title="Save (⌘S)"
-        >
-          {isSyncing ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-          Save
-        </button>
-      )}
-
       {/* Export — click-based beautiful dropdown */}
       <div className="relative" ref={exportRef}>
         <button
@@ -210,7 +198,14 @@ export function TopBar({ onUndo, onRedo, onSave, onExport, canUndo, canRedo, can
       <span className="text-slate-300">|</span>
 
       {/* Share */}
-      <IconBtn icon={Share2} label="Share" onClick={() => togglePanel('shareModalOpen')} active={shareModalOpen} />
+      <button
+        onClick={() => togglePanel('shareModalOpen')}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-all shadow-sm shadow-emerald-200 active:scale-95"
+        title="Share"
+      >
+        <Share2 size={12} />
+        Share
+      </button>
 
       {/* Branch history */}
       <IconBtn icon={GitBranch} label="Version history" onClick={() => togglePanel('branchHistoryOpen')} active={branchHistoryOpen} />
