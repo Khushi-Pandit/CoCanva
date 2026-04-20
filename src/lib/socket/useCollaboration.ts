@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { getSocket } from './socket.client';
 import { useCollaborationStore } from '@/store/collaboration.store';
@@ -18,6 +18,7 @@ interface UseCollaborationOptions {
 }
 
 export function useCollaboration({ canvasId, token, shareToken, onCanvasJoined, onCanvasState: onCanvasStateOverride }: UseCollaborationOptions) {
+  const [activeSocket, setActiveSocket] = useState<Socket | null>(null);
   const socketRef  = useRef<Socket | null>(null);
   const mySocketId = useRef<string>('');
 
@@ -36,6 +37,7 @@ export function useCollaboration({ canvasId, token, shareToken, onCanvasJoined, 
 
     const s = getSocket(token);
     socketRef.current = s;
+    setActiveSocket(s);
 
     // ── Connect → join canvas room ──────────────────────────────────────────
     const onConnect = () => {
@@ -290,7 +292,7 @@ export function useCollaboration({ canvasId, token, shareToken, onCanvasJoined, 
   }, []);
 
   return {
-    socket:             socketRef.current,
+    socket:             activeSocket,
     mySocketId:         mySocketId.current,
     emitElementAdd,
     emitElementUpdate,

@@ -68,6 +68,7 @@ export default function NotesPage() {
 
   const { isTranscribing, startTranscription, stopTranscription, error: transcriptionError } = useTranscription({
     onChunk: (text) => {
+      console.log('[page.tsx] onChunk received:', text, '| socket:', !!socketRef.current);
       if (socketRef.current) {
         socketRef.current.emit('voice:transcript_chunk', {
           canvasId,
@@ -75,6 +76,9 @@ export default function NotesPage() {
           transcript: text,
           userName: firebaseUserRef.current?.displayName || 'User'
         });
+        console.log('[page.tsx] Emitted voice:transcript_chunk to backend');
+      } else {
+        console.warn('[page.tsx] Socket is null! Cannot emit transcript chunk.');
       }
     }
   });
