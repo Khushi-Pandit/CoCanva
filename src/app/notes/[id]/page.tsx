@@ -315,6 +315,14 @@ export default function NotesPage() {
     if (changed) ph([...useCanvasStore.getState().elements]);
   }, [emitElementUpdate]);
 
+  // ── Clear All (current page) ────────────────────────────────────────────────
+  const handleClearAll = useCallback(() => {
+    useCanvasStore.getState().setElements([]);
+    pushHistory([]);
+    emitCanvasClear();
+    addToast('Page cleared', 'info', 2000);
+  }, [emitCanvasClear, pushHistory, addToast]);
+
   const handleThumbnailCapture = useCallback(async (dataUrl: string) => {
     try { await thumbnailApi.upload(canvasId, dataUrl); } catch { /* bg */ }
   }, [canvasId]);
@@ -350,8 +358,25 @@ export default function NotesPage() {
       addToast('Preparing PDF — capturing all pages…', 'info', 3000);
       try {
         const { exportNotesPDF } = await import('@/lib/notes.export');
-        await exportNotesPDF({ canvasId, canvasTitle, shareToken, pages, pageW, pageH, saveCurrentPage: () => handleSave(true) });
-        addToast('PDF exported!', 'success', 2000);
+        await exportNotesPDF({ 
+          canvasId, 
+          canvasTitle, 
+          shareToken, 
+          pages, 
+          pageW, 
+          pageH, 
+          saveCurrentPage: () => handleSave(true),
+          pageSummaries: notesStore.pageSummaries,
+          generateSummary: async (idx, pngData) => {
+            const res = await aiApi.summarizeNotesPage(canvasId, pngData, idx);
+            notesStore.setPageSummary(idx, res.summary);
+            return res.summary;
+          },
+          onProgress: (msg) => {
+            addToast(msg, 'info', 3000);
+          }
+        });
+        addToast('PDF exported successfully!', 'success', 2000);
       } catch (e: any) { addToast(`PDF export failed: ${e?.message ?? ''}`, 'error'); }
     } else if (fmt === 'png') {
       addToast('Preparing Images ZIP — capturing all pages…', 'info', 3000);
@@ -522,6 +547,7 @@ export default function NotesPage() {
           canUndo={historyIndex > 0}
           canRedo={historyIndex < history.length - 1}
           canEdit={canEdit}
+          onClearAll={canEdit ? handleClearAll : undefined}
         />
 
         {/* Navigator toggle button — sits just below the top bar on the left */}

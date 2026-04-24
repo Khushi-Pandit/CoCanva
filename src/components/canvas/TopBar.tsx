@@ -1,9 +1,10 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Undo2, Redo2, ZoomIn, ZoomOut, Grid3X3, Download,
   Share2, GitBranch, MessageSquare, Users, Wifi, WifiOff,
-  ChevronRight, Settings, Loader2, Home, Image, FileCode, FileText, FileJson,
+  ChevronRight, Settings, Loader2, Home, Image, FileCode, FileText, FileJson, Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCanvasStore } from '@/store/canvas.store';
@@ -20,9 +21,10 @@ interface TopBarProps {
   canUndo: boolean;
   canRedo: boolean;
   canEdit: boolean;
+  onClearAll?: () => void;
 }
 
-export function TopBar({ onUndo, onRedo, onSave, onExport, canUndo, canRedo, canEdit }: TopBarProps) {
+export function TopBar({ onUndo, onRedo, onSave, onExport, canUndo, canRedo, canEdit, onClearAll }: TopBarProps) {
   const { viewport, canvasTitle, showGrid, toggleGrid, zoomViewport, resetViewport, canvasId, lastSaved, isSyncing, role } = useCanvasStore();
   const { isConnected, peers } = useCollaborationStore();
   const { togglePanel, shareModalOpen, annotationsOpen, branchHistoryOpen, exportModalOpen, addToast } = useUIStore();
@@ -30,6 +32,7 @@ export function TopBar({ onUndo, onRedo, onSave, onExport, canUndo, canRedo, can
   const [editingTitle, setEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState(canvasTitle);
   const [exportOpen, setExportOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
 
@@ -251,6 +254,52 @@ export function TopBar({ onUndo, onRedo, onSave, onExport, canUndo, canRedo, can
       {/* Role badge */}
       {role !== 'owner' && role !== 'editor' && (
         <span className="badge bg-sky-50 border border-sky-200 text-sky-600">{role}</span>
+      )}
+
+      {/* Clear All */}
+      {onClearAll && (
+        <>
+          <span className="text-slate-300">|</span>
+          <button
+            onClick={() => setClearConfirmOpen(true)}
+            title="Clear all elements"
+            className="tool-btn text-red-500 hover:text-red-600 hover:bg-red-50"
+          >
+            <Trash2 size={15} />
+          </button>
+
+          {clearConfirmOpen && typeof document !== 'undefined' && createPortal(
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4 animate-slide-up border border-slate-200">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4 mx-auto">
+                  <Trash2 size={24} className="text-red-600" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 text-center mb-2">Clear everything?</h3>
+                <p className="text-sm text-slate-500 text-center mb-6">
+                  This will permanently remove all elements from the canvas. This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setClearConfirmOpen(false)}
+                    className="flex-1 py-2.5 px-4 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setClearConfirmOpen(false);
+                      onClearAll();
+                    }}
+                    className="flex-1 py-2.5 px-4 text-sm font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors shadow-sm shadow-red-500/20"
+                  >
+                    Yes, clear it
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
+        </>
       )}
     </div>
   );

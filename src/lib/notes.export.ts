@@ -22,6 +22,12 @@ export interface NotesExportOptions {
   pageH: number;
   /** Force save current unsaved strokes before exporting */
   saveCurrentPage: () => Promise<void>;
+  /** Existing AI summaries by page index */
+  pageSummaries?: Record<number, string>;
+  /** Callback to generate AI summary for a page on the fly */
+  generateSummary?: (pageIndex: number, pngData: string) => Promise<string>;
+  /** Progress callback */
+  onProgress?: (msg: string) => void;
 }
 
 function escapeXML(str: string): string {
@@ -36,6 +42,35 @@ function escapeXML(str: string): string {
       default: return c;
     }
   });
+}
+
+function parseMarkdownToHTML(md: string): string {
+  if (!md) return '';
+  let html = md
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+    
+  // Bold
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  
+  // Headers
+  html = html.replace(/^### (.*$)/gim, '<h3 style="font-size:18px; margin: 12px 0 6px; color:#0f172a;">$1</h3>');
+  html = html.replace(/^## (.*$)/gim, '<h2 style="font-size:22px; margin: 16px 0 8px; color:#0f172a; border-bottom:1px solid #cbd5e1; padding-bottom:4px;">$1</h2>');
+  html = html.replace(/^# (.*$)/gim, '<h1 style="font-size:26px; margin: 20px 0 10px; color:#0f172a;">$1</h1>');
+
+  // Lists
+  html = html.replace(/^\s*[-*]\s+(.*)$/gim, '<li style="margin-left:24px; margin-bottom:6px; display:list-item;">$1</li>');
+  html = html.replace(/(<li[^>]*>.*?<\/li>\n*)+/g, '<ul style="margin:12px 0; padding-left:0; list-style-type:disc;">$&</ul>');
+
+  // Paragraphs
+  html = html.split(/\n\n+/).map(p => {
+    if (p.trim().startsWith('<h') || p.trim().startsWith('<ul')) return p;
+    return `<p style="margin: 0 0 12px 0; line-height: 1.6;">${p.replace(/\n/g, '<br/>')}</p>`;
+  }).join('\n');
+
+  return html;
 }
 
 // ── SVG Generation (Fixed Page Bounds) ───────────────────────────────────────
@@ -181,6 +216,8 @@ export async function exportNotesPDF(opts: NotesExportOptions): Promise<void> {
   for (let i = 0; i < sorted.length; i++) {
     const page = sorted[i];
     if (i > 0) pdf.addPage([wMm, hMm]);
+    
+    opts.onProgress?.(`Exporting Drawing (Page ${i + 1}/${sorted.length})...`);
 
     const pageElements = allEls.filter((e: any) => (e.pageIndex ?? 0) === page.pageIndex);
     const svgStr = generateNotesSVG(pageElements, pageW, pageH);
@@ -190,6 +227,44 @@ export async function exportNotesPDF(opts: NotesExportOptions): Promise<void> {
     
     if (dataUrl) {
       pdf.addImage(dataUrl, 'PNG', 0, 0, wMm, hMm, undefined, 'FAST');
+    }
+    
+    // ── INNOVATION: AI Summary Companion Page ──
+    let summary = opts.pageSummaries?.[page.pageIndex];
+    if (!summary && opts.generateSummary && dataUrl && pageElements.length > 0) {
+      opts.onProgress?.(`Generating AI Notes (Page ${i + 1}/${sorted.length})...`);
+      try {
+        summary = await opts.generateSummary(page.pageIndex, dataUrl);
+      } catch (e) {
+        console.error('Failed to generate summary for export', e);
+      }
+    }
+
+    if (summary || pageElements.length === 0) {
+      pdf.addPage([wMm, hMm]);
+      
+      const finalSummary = summary || (pageElements.length === 0 ? "This page is intentionally left blank." : "No summary could be generated for this page.");
+      const htmlContent = parseMarkdownToHTML(finalSummary);
+      const label = page.label || `Page ${page.pageIndex + 1}`;
+      
+      const summarySvg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${pageW}" height="${pageH}" viewBox="0 0 ${pageW} ${pageH}">
+  <rect width="${pageW}" height="${pageH}" fill="#f8fafc" />
+  <rect width="${pageW}" height="8" fill="#10b981" />
+  <foreignObject x="40" y="40" width="${pageW - 80}" height="${pageH - 80}">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; color: #475569;">
+      <div style="font-size: 26px; font-weight: bold; color: #0f172a; margin-bottom: 8px;">AI Notes: ${escapeXML(label)}</div>
+      <div style="height: 1px; background: #cbd5e1; margin-bottom: 24px;"></div>
+      ${htmlContent}
+    </div>
+  </foreignObject>
+  <text x="40" y="${pageH - 20}" font-family="sans-serif" font-size="10" fill="#94a3b8">DrawSync AI Companion • Notes for ${escapeXML(label)}</text>
+</svg>`;
+
+      const summaryDataUrl = await renderSVGToPNG(summarySvg, pageW, pageH, 2.5);
+      if (summaryDataUrl) {
+        pdf.addImage(summaryDataUrl, 'PNG', 0, 0, wMm, hMm, undefined, 'FAST');
+      }
     }
   }
 

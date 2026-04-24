@@ -384,22 +384,29 @@ export default function CanvasPage() {
   const handleStyleChange = useCallback((updates: Partial<DrawableElement>) => {
     const { selectedIds, updateElement, pushHistory, elements } = useCanvasStore.getState();
     if (selectedIds.length === 0) return;
-    
+
     let changed = false;
     selectedIds.forEach(id => {
       updateElement(id, updates as any);
-      
       const updatedEl = useCanvasStore.getState().elements.find(e => e.id === id);
       if (updatedEl) {
         emitElementUpdate(toAPI(updatedEl));
         changed = true;
       }
     });
-    
+
     if (changed) {
       pushHistory([...useCanvasStore.getState().elements]);
     }
   }, [emitElementUpdate]);
+
+  // ── Clear All ──────────────────────────────────────────────────────────────────
+  const handleClearAll = useCallback(() => {
+    useCanvasStore.getState().setElements([]);
+    pushHistory([]);
+    emitCanvasClear();
+    addToast('Canvas cleared', 'info', 2000);
+  }, [emitCanvasClear, pushHistory, addToast]);
 
   // ── Export ─────────────────────────────────────────────────────────────────────
   const handleExport = useCallback((fmt: 'png' | 'svg' | 'pdf' | 'json') => {
@@ -448,6 +455,7 @@ export default function CanvasPage() {
         canUndo={historyIndex > 0}
         canRedo={historyIndex < history.length - 1}
         canEdit={canEdit}
+        onClearAll={canEdit ? handleClearAll : undefined}
       />
 
       {/* Voice room (top right) */}

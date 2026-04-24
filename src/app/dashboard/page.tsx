@@ -51,7 +51,7 @@ function ListRow({ canvas, onRename, onDelete, onDuplicate }: {
   };
 
   return (
-    <div className="relative group flex items-center gap-3 px-3 py-2.5 bg-white border border-slate-200 rounded-xl hover:shadow-sm hover:border-slate-300 transition-all overflow-hidden">
+    <div className="relative group flex items-center gap-3 px-3 py-2.5 bg-white border border-slate-200 rounded-xl hover:shadow-sm hover:border-slate-300 transition-all">
       {/* Delete Confirmation Overlay */}
       {showDeleteConfirm && (
         <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-between px-6 animate-in slide-in-from-right-8 fade-in duration-200">
@@ -154,7 +154,7 @@ function ListRow({ canvas, onRename, onDelete, onDuplicate }: {
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); }} 
             />
             <div
-              className="absolute right-0 bottom-full mb-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 min-w-[150px] z-50 animate-in slide-in-from-bottom-2 fade-in duration-150"
+              className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 min-w-[150px] z-50 animate-in slide-in-from-top-2 fade-in duration-150"
               onClick={(e) => e.stopPropagation()}
             >
               {[

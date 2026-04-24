@@ -5,7 +5,7 @@ import {
   Pencil, PenLine, Highlighter, Paintbrush, Eraser,
   Square, Circle, Triangle, Diamond, Minus, ArrowRight,
   Type, MousePointer2, Hand, Workflow,
-  Sparkles, Minus as LineIcon,
+  Sparkles, Minus as LineIcon, Trash2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -78,10 +78,10 @@ const COLORS = [
   '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#ffffff',
 ];
 
-type OpenMenu = 'draw' | 'shape' | 'fc' | 'connector' | 'color' | 'width' | null;
+type OpenMenu = 'draw' | 'shape' | 'fc' | 'connector' | 'color' | 'width' | 'clear' | null;
 
-interface ToolbarProps { 
-  canEdit: boolean; 
+interface ToolbarProps {
+  canEdit: boolean;
   onStyleChange?: (updates: Partial<DrawableElement>) => void;
 }
 
@@ -307,6 +307,7 @@ export function Toolbar({ canEdit, onStyleChange }: ToolbarProps) {
       >
         <Sparkles size={16} />
       </button>
+
     </div>
   );
 }
