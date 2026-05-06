@@ -66,7 +66,7 @@ export default function SignupPage() {
               <span className="text-white font-black text-[13px]">DS</span>
             </div>
             <div>
-              <p className="font-bold text-slate-900 leading-none">DrawSync</p>
+              <p className="font-bold text-slate-900 leading-none">Kollab</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Collaborative Canvas</p>
             </div>
           </div>
