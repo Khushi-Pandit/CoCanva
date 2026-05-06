@@ -63,7 +63,7 @@ export default function SignupPage() {
         <div className="bg-white rounded-3xl shadow-xl p-8 border border-slate-100">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-              <span className="text-white font-black text-[13px]">DS</span>
+              <span className="text-white font-black text-[13px]">K</span>
             </div>
             <div>
               <p className="font-bold text-slate-900 leading-none">Kollab</p>
