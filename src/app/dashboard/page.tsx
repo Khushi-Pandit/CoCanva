@@ -326,10 +326,10 @@ export default function DashboardPage() {
         <div className="px-4 py-5 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-              <span className="text-white font-black text-[11px]">DS</span>
+              <span className="text-white font-black text-[11px]">K</span>
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-800 leading-none">DrawSync</p>
+              <p className="text-sm font-bold text-slate-800 leading-none">Kollab</p>
               <p className="text-[10px] text-slate-400 mt-0.5">Collaborative Canvas</p>
             </div>
           </div>

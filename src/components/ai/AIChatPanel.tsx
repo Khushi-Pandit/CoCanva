@@ -247,7 +247,7 @@ export function AIChatPanel({ canvasId, onGhostElementsGenerated, mode = 'canvas
           <Wand2 size={14} className="text-violet-600" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-800 leading-none">DrawSync AI Agent</p>
+          <p className="text-sm font-semibold text-slate-800 leading-none">Kollab AI Agent</p>
           <p className="text-[10px] text-slate-400 mt-0.5">
             {availableModels.length > 0
               ? `${availableModels.length} model${availableModels.length > 1 ? 's' : ''} • Can generate & modify canvas`

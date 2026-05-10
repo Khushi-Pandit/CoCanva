@@ -315,7 +315,7 @@ export async function exportNotesPDF(opts: NotesExportOptions): Promise<void> {
       pdf.setFontSize(9);
       pdf.setFont('helvetica', 'normal');
       pdf.setTextColor(148, 163, 184); // slate-400
-      pdf.text(`DrawSync AI Companion • Notes for ${label}`, 20, hMm - 15);
+      pdf.text(`Kollab AI Companion • Notes for ${label}`, 20, hMm - 15);
     }
   }
 

@@ -113,9 +113,9 @@ export default function LandingPage() {
       <header className="relative z-20 flex items-center justify-between px-6 py-5 max-w-7xl mx-auto w-full">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-[0_0_20px_rgba(52,211,153,0.3)]">
-            <span className="text-white font-black text-[12px] tracking-tight">DS</span>
+            <span className="text-white font-black text-[12px] tracking-tight">K</span>
           </div>
-          <span className="text-xl font-bold tracking-tight text-white">DrawSync</span>
+          <span className="text-xl font-bold tracking-tight text-white">Kollab</span>
         </div>
 
         <div className="flex items-center gap-4">
@@ -176,7 +176,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-20 space-y-4">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">Everything you need to map complex ideas</h2>
-            <p className="text-slate-400 max-w-2xl mx-auto">Skip the heavy modeling tools. DrawSync is instantly familiar, infinitely scalable, and surprisingly powerful.</p>
+            <p className="text-slate-400 max-w-2xl mx-auto">Skip the heavy modeling tools. Kollab is instantly familiar, infinitely scalable, and surprisingly powerful.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
@@ -207,7 +207,7 @@ export default function LandingPage() {
 
       {/* ── Footer ── */}
       <footer className="relative z-10 border-t border-slate-800/50 bg-slate-950 py-12 text-center text-slate-500">
-        <p className="text-sm font-medium">© {new Date().getFullYear()} DrawSync. Designed for builders.</p>
+        <p className="text-sm font-medium">© {new Date().getFullYear()} Kollab. Designed for builders.</p>
       </footer>
     </div>
   );

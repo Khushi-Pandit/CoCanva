@@ -9,7 +9,7 @@ export function exportCanvas(
 ): void {
   if (format === 'json') {
     const blob = new Blob([JSON.stringify({ elements, viewport, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
-    downloadBlob(blob, `drawsync-${canvasId}.json`);
+    downloadBlob(blob, `kollab-${canvasId}.json`);
     return;
   }
 
@@ -53,7 +53,7 @@ export function exportCanvas(
       printWindow.document.write(`
         <html>
           <head>
-            <title>Export PDF - DrawSync</title>
+            <title>Export PDF - Kollab</title>
             <style>
               @media print {
                 @page { margin: 0; }

@@ -19,13 +19,13 @@ const dmMono = DM_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'DrawSync — Collaborative Canvas',
-    template: '%s | DrawSync',
+    default: 'Kollab — AI Collaborative Canvas',
+    template: '%s | Kollab',
   },
   description: 'Real-time collaborative canvas with AI-powered suggestions, voice chat, and unlimited drawing possibilities.',
   keywords: ['collaborative canvas', 'whiteboard', 'AI drawing', 'real-time collaboration', 'flowchart'],
   openGraph: {
-    title: 'DrawSync — Collaborative Canvas',
+    title: 'Kollab — AI Collaborative Canvas',
     description: 'Draw, diagram, brainstorm — all together in real time.',
     type: 'website',
   },
